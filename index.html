@@ -67,6 +67,7 @@
     <nav style="display:flex;gap:1.25rem">
       <button class="tab-btn" data-tab="dashboard" onclick="switchTab('dashboard')">대시보드</button>
       <button class="tab-btn" data-tab="input"     onclick="switchTab('input')">내역 입력</button>
+      <button class="tab-btn" data-tab="fixed"     onclick="switchTab('fixed')">고정지출</button>
       <button class="tab-btn" data-tab="keywords"  onclick="switchTab('keywords')">키워드 관리</button>
     </nav>
   </header>
@@ -276,6 +277,49 @@
     </div>
     <div style="height:2rem"></div>
   </div><!-- /tab-keywords -->
+
+
+  <!-- ══════════════════════════════════════════
+    탭 4: 고정지출 설정
+  ══════════════════════════════════════════ -->
+  <div id="tab-fixed" class="tab-content hidden">
+    <div style="display:flex;flex-direction:column;gap:.75rem">
+
+      <!-- 추가 폼 -->
+      <div class="card">
+        <h2 style="font-size:.8125rem;font-weight:700;color:var(--t2);margin-bottom:.25rem">고정 지출 설정</h2>
+        <p style="font-size:.6875rem;color:var(--t4);margin-bottom:.875rem">매월 반복되는 지출을 등록해두면 한 번에 이번 달에 추가할 수 있어요.</p>
+        <div style="display:flex;flex-direction:column;gap:.5rem">
+          <div style="display:flex;gap:.5rem">
+            <input id="fixedName" type="text" placeholder="항목명 (예: 아파트 관리비)" class="app-input" style="flex:1;min-width:0"
+              onkeydown="if(event.key==='Enter')addFixed()">
+            <input id="fixedAmount" type="number" placeholder="금액" class="app-input" style="width:108px;flex-shrink:0"
+              onkeydown="if(event.key==='Enter')addFixed()">
+          </div>
+          <div style="display:flex;gap:.5rem">
+            <select id="fixedCategory" class="app-input" style="flex:1"></select>
+            <button onclick="addFixed()" class="btn-sm">추가하기</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 이번 달 불러오기 카드 -->
+      <div id="fixedApplyCard" class="card hidden" style="padding:.875rem 1.25rem">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:.75rem;flex-wrap:wrap">
+          <div>
+            <p style="font-size:.8125rem;font-weight:700;color:var(--t2)">이번 달 고정지출 불러오기</p>
+            <p id="fixedApplyDesc" style="font-size:.6875rem;color:var(--t4);margin-top:.2rem"></p>
+          </div>
+          <button onclick="applyFixedToMonth()" class="btn-sm" id="fixedApplyBtn" style="background:#4F46E5;color:#fff;flex-shrink:0">불러오기</button>
+        </div>
+      </div>
+
+      <!-- 등록 목록 -->
+      <div id="fixedList" style="display:flex;flex-direction:column;gap:.5rem"></div>
+
+    </div>
+    <div style="height:2rem"></div>
+  </div><!-- /tab-fixed -->
 
 </div><!-- /app -->
 

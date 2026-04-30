@@ -20,7 +20,7 @@ const CAT_GROUPS_FOR_TABS = {
   '기타':      ['기타'],
 };
 
-const SK = { TX: 'vml_transactions', KW: 'vml_keyword_map', DARK: 'vml_dark', LAYOUT: 'vml_layout' };
+const SK = { TX: 'vml_transactions', KW: 'vml_keyword_map', DARK: 'vml_dark', LAYOUT: 'vml_layout', FIXED: 'vml_fixed', FIXED_APPLIED: 'vml_fixed_applied' };
 
 const state = {
   ym: `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`,
@@ -45,6 +45,10 @@ const getPrevYM = (ym) => {
 };
 const getKwMap  = () => JSON.parse(localStorage.getItem(SK.KW) || '{}');
 const saveKwMap = m => localStorage.setItem(SK.KW, JSON.stringify(m));
+const getFixed  = () => JSON.parse(localStorage.getItem(SK.FIXED) || '[]');
+const saveFixed = arr => localStorage.setItem(SK.FIXED, JSON.stringify(arr));
+const getFixedApplied  = () => JSON.parse(localStorage.getItem(SK.FIXED_APPLIED) || '{}');
+const saveFixedApplied = obj => localStorage.setItem(SK.FIXED_APPLIED, JSON.stringify(obj));
 const saveMth   = (ym, data) => {
   const all = JSON.parse(localStorage.getItem(SK.TX) || '{}');
   all[ym] = data;
@@ -292,10 +296,12 @@ const readFile = async (file) => {
   }
 };
 
-function showConfirm(title, desc, onOk) {
+function showConfirm(title, desc, onOk, okLabel = '삭제', okColor = '#EF4444') {
   document.getElementById('confirmTitle').textContent = title;
   document.getElementById('confirmDesc').textContent  = desc;
   const btn = document.getElementById('confirmOkBtn');
+  btn.textContent   = okLabel;
+  btn.style.background = okColor;
   btn.onclick = () => { onOk(); closeConfirm(); };
   document.getElementById('confirmModal').classList.remove('hidden');
 }
@@ -345,6 +351,7 @@ function switchTab(tab) {
   if (activeBtn) activeBtn.classList.add('tab-active');
   if (tab === 'dashboard') renderDashboard();
   if (tab === 'keywords')  renderKeywords();
+  if (tab === 'fixed')     renderFixed();
   refreshIcons();
 }
 
@@ -562,6 +569,136 @@ function openCategoryModal(idx) {
 }
 
 function closeModal() { document.getElementById('categoryModal').classList.add('hidden'); }
+
+/* ── 고정지출 설정 ── */
+function renderFixed() {
+  const list = getFixed();
+
+  // 카테고리 셀렉트 초기화 (고정지출 기본 선택)
+  const sel = document.getElementById('fixedCategory');
+  if (sel) {
+    sel.innerHTML = Object.keys(CATEGORIES).map(c =>
+      `<option value="${c}"${c === '고정지출' ? ' selected' : ''}>${c}</option>`
+    ).join('');
+  }
+
+  // 등록 목록
+  const container = document.getElementById('fixedList');
+  if (container) {
+    if (list.length === 0) {
+      container.innerHTML = `
+        <div class="card" style="text-align:center;padding:1.75rem;color:var(--t5);font-size:.8125rem">
+          등록된 고정지출이 없습니다.<br>
+          <span style="font-size:.6875rem">위 폼에서 항목을 추가해보세요.</span>
+        </div>`;
+    } else {
+      const total = list.reduce((s, i) => s + i.amount, 0);
+      container.innerHTML = list.map(item => {
+        const info = CATEGORIES[item.category] || { color:'#94A3B8' };
+        return `
+          <div class="card" style="padding:.75rem 1rem;display:flex;align-items:center;gap:.75rem">
+            <span style="width:.4rem;height:.4rem;border-radius:50%;background:${info.color};flex-shrink:0"></span>
+            <div style="flex:1;min-width:0;overflow:hidden">
+              <div style="font-size:.875rem;font-weight:700;color:var(--t1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${item.name}</div>
+              <div style="font-size:.6875rem;color:${info.color};font-weight:600;margin-top:.1rem">${item.category}</div>
+            </div>
+            <div class="num" style="font-size:.9375rem;font-weight:800;color:var(--t1);flex-shrink:0">${fmtAmt(item.amount)}</div>
+            <button onclick="removeFixed('${item.id}')"
+              style="color:var(--t5);background:none;border:none;cursor:pointer;padding:.25rem;border-radius:.375rem;flex-shrink:0;transition:color .15s;display:flex;align-items:center"
+              onmouseover="this.style.color='#EF4444'" onmouseout="this.style.color='var(--t5)'">
+              <i data-lucide="trash-2" style="width:14px;height:14px"></i>
+            </button>
+          </div>`;
+      }).join('') + `
+        <div style="display:flex;justify-content:flex-end;padding:.25rem .25rem 0">
+          <span class="num" style="font-size:.75rem;color:var(--t4)">월 합계 <strong style="color:var(--t2)">${fmtAmt(total)}</strong></span>
+        </div>`;
+    }
+  }
+
+  // 이번 달 불러오기 카드
+  const applyCard = document.getElementById('fixedApplyCard');
+  const applyDesc = document.getElementById('fixedApplyDesc');
+  const applyBtn  = document.getElementById('fixedApplyBtn');
+  if (applyCard) {
+    if (list.length === 0) {
+      applyCard.classList.add('hidden');
+    } else {
+      applyCard.classList.remove('hidden');
+      const applied = getFixedApplied();
+      const total   = list.reduce((s, i) => s + i.amount, 0);
+      if (applied[state.ym]) {
+        applyDesc.textContent = `${fmtYM(state.ym)} 이미 적용됨 · ${list.length}건 · 총 ${fmtAmt(total)}`;
+        if (applyBtn) { applyBtn.textContent = '다시 불러오기'; applyBtn.style.background = '#64748B'; }
+      } else {
+        applyDesc.textContent = `${fmtYM(state.ym)} · ${list.length}건 · 총 ${fmtAmt(total)} 추가됩니다`;
+        if (applyBtn) { applyBtn.textContent = '불러오기'; applyBtn.style.background = '#4F46E5'; }
+      }
+    }
+  }
+
+  refreshIcons();
+}
+
+window.addFixed = () => {
+  const name   = document.getElementById('fixedName').value.trim();
+  const amtRaw = document.getElementById('fixedAmount').value.trim();
+  const cat    = document.getElementById('fixedCategory').value;
+  if (!name) { showToast('항목명을 입력해주세요.'); return; }
+  const amount = parseInt(amtRaw.replace(/[^0-9]/g, ''));
+  if (!amount || amount <= 0) { showToast('금액을 올바르게 입력해주세요.'); return; }
+  const list = getFixed();
+  list.push({ id: genId(), name, amount, category: cat });
+  saveFixed(list);
+  document.getElementById('fixedName').value   = '';
+  document.getElementById('fixedAmount').value = '';
+  renderFixed();
+  showToast(`${name} 추가됨 ✓`);
+};
+
+window.removeFixed = (id) => {
+  const item = getFixed().find(i => i.id === id);
+  showConfirm(
+    `${item?.name || '항목'} 삭제`,
+    '이 고정지출 항목을 삭제하시겠습니까?',
+    () => { saveFixed(getFixed().filter(i => i.id !== id)); renderFixed(); },
+    '삭제', '#EF4444'
+  );
+};
+
+window.applyFixedToMonth = () => {
+  const list = getFixed();
+  if (list.length === 0) return;
+  const applied  = getFixedApplied();
+  const total    = list.reduce((s, i) => s + i.amount, 0);
+  const isRepeat = !!applied[state.ym];
+  showConfirm(
+    `${fmtYM(state.ym)} 고정지출 추가`,
+    isRepeat
+      ? `이미 적용된 달입니다. 중복 추가됩니다. 계속하시겠습니까?\n(${list.length}건 · 총 ${fmtAmt(total)})`
+      : `${list.length}건 · 총 ${fmtAmt(total)}을 이번 달 내역에 추가합니다.`,
+    () => {
+      const all = JSON.parse(localStorage.getItem(SK.TX) || '{}');
+      const newTxs = list.map(item => ({
+        id: genId(),
+        date: `${state.ym}-01`,
+        merchant: item.name,
+        amount: item.amount,
+        category: item.category,
+        isInstallment: false,
+        isCancelled: false,
+      }));
+      all[state.ym] = [...(all[state.ym] || []), ...newTxs];
+      localStorage.setItem(SK.TX, JSON.stringify(all));
+      applied[state.ym] = true;
+      saveFixedApplied(applied);
+      renderFixed();
+      showToast(`${list.length}건 추가됨 ✓`);
+    },
+    isRepeat ? '중복 추가' : '추가',
+    '#4F46E5'
+  );
+};
 
 /* ── 캘린더 뷰 ── */
 function switchRightTab(tab) {
