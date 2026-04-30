@@ -1,0 +1,176 @@
+:root {
+  --bg-page: #F8FAFC;
+  --bg-card: #FFFFFF;
+  --bg-inset: #F1F5F9;
+  --bg-raised: #E2E8F0;
+  --bg-header: #FFFFFF;
+  --t1: #0F172A;
+  --t2: #1E293B;
+  --t3: #64748B;
+  --t4: #94A3B8;
+  --t5: #CBD5E1;
+  --border: #E2E8F0;
+  --divider: #F1F5F9;
+  --header-border: #E2E8F0;
+  --btn-bg: #0F172A;
+  --btn-fg: #FFFFFF;
+  --btn-hover: #1E293B;
+  --input-bg: #FFFFFF;
+  --input-border: #E2E8F0;
+  --input-focus: #0F172A;
+  --placeholder: #CBD5E1;
+  --badge-lump-bg: #EEF2FF; --badge-lump-fg: #4338CA;
+  --badge-inst-bg: #F5F3FF; --badge-inst-fg: #7C3AED;
+  --toggle-bg: #F1F5F9;
+  --toggle-border: #E2E8F0;
+  --toggle-on-bg: #0F172A;
+  --toggle-on-fg: #FFFFFF;
+  --shadow-card: 0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
+  --scrollbar: #E2E8F0;
+  --chart-border: #FFFFFF;
+  --tab-active: #0F172A;
+}
+
+html.dark {
+  --bg-page: #0A0F1E;
+  --bg-card: #141B2D;
+  --bg-inset: #0A0F1E;
+  --bg-raised: #1E2A3D;
+  --bg-header: #141B2D;
+  --t1: #F0F4FF;
+  --t2: #CBD5E1;
+  --t3: #64748B;
+  --t4: #475569;
+  --t5: #2D3D54;
+  --border: #1E2A3D;
+  --divider: #141B2D;
+  --header-border: #1E2A3D;
+  --btn-bg: #E2E8F0;
+  --btn-fg: #0A0F1E;
+  --btn-hover: #F0F4FF;
+  --input-bg: #0A0F1E;
+  --input-border: #1E2A3D;
+  --input-focus: #94A3B8;
+  --placeholder: #2D3D54;
+  --badge-lump-bg: #1e1b4b; --badge-lump-fg: #818CF8;
+  --badge-inst-bg: #2d1b4e; --badge-inst-fg: #A78BFA;
+  --toggle-bg: #1E2A3D;
+  --toggle-border: #1E2A3D;
+  --toggle-on-bg: #E2E8F0;
+  --toggle-on-fg: #0A0F1E;
+  --shadow-card: 0 1px 3px rgba(0,0,0,.4), 0 1px 2px rgba(0,0,0,.3);
+  --scrollbar: #1E2A3D;
+  --chart-border: #141B2D;
+  --tab-active: #E2E8F0;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html { transition: background .25s, color .25s; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif;
+  background: var(--bg-page); color: var(--t2); min-height: 100vh; margin: 0;
+}
+
+.hidden { display: none !important; }
+.num { font-variant-numeric: tabular-nums; }
+
+.card {
+  background: var(--bg-card); border-radius: 1rem;
+  box-shadow: var(--shadow-card); padding: 1.25rem; transition: all .25s;
+}
+
+.app-header {
+  background: var(--bg-header); border-bottom: 1px solid var(--header-border);
+  position: sticky; top: 0; z-index: 20; padding: 1.125rem 1.25rem 0;
+  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+}
+
+.tab-btn {
+  padding: .625rem 0; font-size: .875rem; font-weight: 500; color: var(--t4);
+  border-bottom: 2px solid transparent; background: none; border: none;
+  cursor: pointer; transition: all .15s; white-space: nowrap;
+}
+.tab-active { color: var(--tab-active) !important; border-bottom-color: var(--tab-active) !important; }
+
+.detail-tab-btn {
+  flex: 1; padding: .35rem 0; font-size: .75rem; font-weight: 600;
+  color: var(--t3); background: transparent; border: none; border-radius: .375rem;
+  cursor: pointer; transition: all .2s; text-align: center;
+}
+.detail-tab-btn.active { background: var(--bg-card); color: var(--t1); box-shadow: var(--shadow-card); }
+.detail-tab-btn:hover:not(.active) { color: var(--t1); }
+
+.badge-lump { background: var(--badge-lump-bg); color: var(--badge-lump-fg); padding: 2px 6px; border-radius: 4px; }
+.badge-install { background: var(--badge-inst-bg); color: var(--badge-inst-fg); padding: 2px 6px; border-radius: 4px; }
+
+.app-input {
+  background: var(--input-bg); border: 1px solid var(--input-border);
+  color: var(--t1); border-radius: .75rem; padding: .625rem .75rem;
+  font-size: .875rem; outline: none; width: 100%;
+}
+
+.btn-primary {
+  background: var(--btn-bg); color: var(--btn-fg); font-size: .875rem; font-weight: 600;
+  border-radius: .75rem; padding: .75rem 1rem; border: none; cursor: pointer; width: 100%;
+}
+
+.view-toggle {
+  display: flex; align-items: center; gap: .3rem; padding: .35rem .6rem;
+  border-radius: .5rem; font-size: .7rem; font-weight: 600;
+  border: 1px solid var(--toggle-border); background: var(--toggle-bg); color: var(--t3);
+  cursor: pointer;
+}
+.view-toggle.on { background: var(--toggle-on-bg); color: var(--toggle-on-fg); }
+
+#app { margin: 0 auto; max-width: 540px; transition: max-width .3s; }
+.dash-grid { display: flex; flex-direction: column; gap: .75rem; }
+
+html.pc-mode #app { max-width: 1200px; }
+html.pc-mode .dash-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+
+.upload-zone {
+  border: 2px dashed var(--border); border-radius: .75rem;
+  padding: 1.25rem; text-align: center; background: var(--bg-inset); cursor: pointer;
+  position: relative;
+}
+.upload-zone input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.upload-zone.drag-over { border-color: #6366F1; background: rgba(99, 102, 241, 0.05); }
+
+.modal-sheet {
+  background: var(--bg-card); border-radius: 1.25rem 1.25rem 0 0;
+  padding: 1.25rem; width: 100%; max-width: 580px;
+}
+.modal-center {
+  background: var(--bg-card); border-radius: 1rem; padding: 1.5rem;
+  width: 100%; max-width: 340px;
+}
+
+.divider-row { border-bottom: 1px solid var(--divider); padding: 10px 0; }
+.divider-row:last-child { border-bottom: none; }
+
+.or-divider {
+  display: flex; align-items: center; gap: 10px; color: var(--t5);
+  font-size: 11px; margin: 15px 0;
+}
+.or-divider::before, .or-divider::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+
+.sample-tab-btn {
+  flex: 1; padding: 10px; font-size: 12px; font-weight: 600; color: var(--t4);
+  background: none; border: none; cursor: pointer; border-bottom: 2px solid transparent;
+}
+.sample-tab-btn.active { color: var(--tab-active); border-bottom-color: var(--tab-active); }
+
+.btn-sm {
+  background: var(--btn-bg); color: var(--btn-fg); font-size: .75rem; font-weight: 600;
+  border-radius: .625rem; padding: .45rem .875rem; border: none; cursor: pointer; white-space: nowrap;
+}
+.btn-sm:hover { background: var(--btn-hover); }
+
+.btn-icon {
+  background: none; border: none; cursor: pointer; color: var(--t3);
+  display: flex; align-items: center; justify-content: center; border-radius: .375rem;
+  transition: background .15s;
+}
+.btn-icon:hover { background: var(--bg-raised); }
+
+.fade-out { opacity: 0; transition: opacity .3s; }
