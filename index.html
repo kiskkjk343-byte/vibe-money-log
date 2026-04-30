@@ -132,20 +132,34 @@
       <!-- ── 오른쪽 컬럼 ── -->
       <div class="dash-right">
         <div class="card" style="flex:1">
-          <div style="display:flex;flex-direction:column;gap:.75rem;margin-bottom:.625rem">
-            <div style="display:flex;align-items:center;justify-content:space-between">
-              <h2 style="font-size:.8125rem;font-weight:700;color:var(--t2)">상세 내역</h2>
-              <span id="listCount" style="font-size:.6875rem;color:var(--t4)">0건</span>
+
+          <!-- 뷰 전환 탭 + 카운트/삭제 -->
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.625rem">
+            <div style="display:flex;background:var(--bg-inset);border-radius:.5rem;padding:.2rem">
+              <button class="detail-tab-btn active" id="rightTabBtn-list" onclick="switchRightTab('list')">상세 내역</button>
+              <button class="detail-tab-btn" id="rightTabBtn-calendar" onclick="switchRightTab('calendar')" style="display:flex;align-items:center;gap:.25rem">
+                <i data-lucide="calendar-days" style="width:11px;height:11px"></i>캘린더
+              </button>
             </div>
-            <!-- 상세 내역 필터 탭 -->
-            <div id="detailTabs" style="display:flex;gap:.5rem;padding:.2rem;background:var(--bg-inset);border-radius:.5rem">
+            <div style="display:flex;align-items:center;gap:.5rem">
+              <span id="listCount" style="font-size:.6875rem;color:var(--t4)">0건</span>
+              <button id="clearMonthBtn" onclick="confirmClearMonth()" class="hidden" style="font-size:.6875rem;color:#F87171;background:none;border:none;cursor:pointer;transition:color .15s" onmouseover="this.style.color='#EF4444'" onmouseout="this.style.color='#F87171'">전체 삭제</button>
+            </div>
+          </div>
+
+          <!-- 상세 내역 패널 -->
+          <div id="rightPanel-list">
+            <div id="detailTabs" style="display:flex;gap:.5rem;padding:.2rem;background:var(--bg-inset);border-radius:.5rem;margin-bottom:.625rem">
               <!-- 스크립트에서 동적 생성 -->
             </div>
+            <div id="transactionList"></div>
           </div>
-          <div style="display:flex;justify-content:flex-end;margin-bottom:0.5rem">
-            <button id="clearMonthBtn" onclick="confirmClearMonth()" class="hidden" style="font-size:.6875rem;color:#F87171;background:none;border:none;cursor:pointer;transition:color .15s" onmouseover="this.style.color='#EF4444'" onmouseout="this.style.color='#F87171'">전체 삭제</button>
+
+          <!-- 캘린더 패널 -->
+          <div id="rightPanel-calendar" class="hidden">
+            <div id="calendarGrid"></div>
           </div>
-          <div id="transactionList"></div>
+
         </div>
       </div><!-- /dash-right -->
 

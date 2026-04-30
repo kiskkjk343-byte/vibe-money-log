@@ -29,6 +29,8 @@ const state = {
   modalIdx: null,
   chart: null,
   detailTab: '전체',
+  rightTab: 'list',
+  calDay: null,
 };
 
 /* ── 유틸리티 ── */
@@ -399,8 +401,18 @@ function renderDashboard() {
 
   renderChart(active);
   renderMomComparison(active, prevActive);
-  renderDetailTabs();
-  renderTxList(txs);
+
+  const clearBtn = document.getElementById('clearMonthBtn');
+  if (clearBtn) clearBtn.classList.toggle('hidden', txs.length === 0);
+
+  if (state.rightTab === 'calendar') {
+    const listCountEl = document.getElementById('listCount');
+    if (listCountEl) listCountEl.textContent = `${active.length}건`;
+    renderCalendar(txs);
+  } else {
+    renderDetailTabs();
+    renderTxList(txs);
+  }
 }
 
 function renderChart(txs) {
@@ -508,8 +520,6 @@ function renderTxList(txs) {
 
   const listCountEl = document.getElementById('listCount');
   if (listCountEl) listCountEl.textContent = `${filtered.length}건`;
-  const clearBtn = document.getElementById('clearMonthBtn');
-  if (clearBtn) clearBtn.classList.toggle('hidden', txs.length === 0);
 
   if (filtered.length === 0) {
     list.innerHTML = `<p style="text-align:center;color:var(--t5);padding:2rem 0;font-size:0.8rem">내역이 없습니다</p>`;
@@ -553,6 +563,146 @@ function openCategoryModal(idx) {
 
 function closeModal() { document.getElementById('categoryModal').classList.add('hidden'); }
 
+/* ── 캘린더 뷰 ── */
+function switchRightTab(tab) {
+  state.rightTab = tab;
+  document.getElementById('rightPanel-list').classList.toggle('hidden', tab !== 'list');
+  document.getElementById('rightPanel-calendar').classList.toggle('hidden', tab !== 'calendar');
+  document.getElementById('rightTabBtn-list').classList.toggle('active', tab === 'list');
+  document.getElementById('rightTabBtn-calendar').classList.toggle('active', tab === 'calendar');
+
+  const all = JSON.parse(localStorage.getItem(SK.TX) || '{}');
+  const txs = all[state.ym] || [];
+  const active = txs.filter(t => !t.isCancelled);
+
+  const clearBtn = document.getElementById('clearMonthBtn');
+  if (clearBtn) clearBtn.classList.toggle('hidden', txs.length === 0);
+
+  if (tab === 'calendar') {
+    const listCountEl = document.getElementById('listCount');
+    if (listCountEl) listCountEl.textContent = `${active.length}건`;
+    renderCalendar(txs);
+  } else {
+    renderDetailTabs();
+    renderTxList(txs);
+  }
+  refreshIcons();
+}
+
+function shortFmt(amt) {
+  if (amt >= 10000) {
+    const v = amt / 10000;
+    return (v % 1 === 0 ? v : parseFloat(v.toFixed(1))) + '만';
+  }
+  if (amt >= 1000) return Math.round(amt / 1000) + '천';
+  return String(amt);
+}
+
+function renderCalendar(txs) {
+  const grid = document.getElementById('calendarGrid');
+  if (!grid) return;
+
+  const active = (txs || []).filter(t => !t.isCancelled);
+  const [year, month] = state.ym.split('-').map(Number);
+  const firstDay    = new Date(year, month - 1, 1).getDay();
+  const daysInMonth = new Date(year, month, 0).getDate();
+
+  // 날짜별 지출 합계 + 내역 목록
+  const dayTotals = {};
+  const dayTxMap  = {};
+  for (const tx of active) {
+    const d = parseInt(tx.date.split('-')[2]);
+    if (isNaN(d)) continue;
+    dayTotals[d] = (dayTotals[d] || 0) + tx.amount;
+    if (!dayTxMap[d]) dayTxMap[d] = [];
+    dayTxMap[d].push(tx);
+  }
+  const maxAmt = Math.max(...Object.values(dayTotals), 1);
+
+  const isDark = document.documentElement.classList.contains('dark');
+  const today  = new Date();
+  const isThisMonth = `${today.getFullYear()}-${pad(today.getMonth()+1)}` === state.ym;
+  const todayD = today.getDate();
+
+  const WDAYS = ['일','월','화','수','목','금','토'];
+
+  // 요일 헤더
+  let html = `<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:.375rem">`;
+  WDAYS.forEach((w, i) => {
+    const c = i===0 ? '#EF4444' : i===6 ? '#3B82F6' : 'var(--t4)';
+    html += `<div style="text-align:center;padding:.15rem 0;font-size:.5625rem;font-weight:700;color:${c}">${w}</div>`;
+  });
+  html += '</div>';
+
+  // 날짜 셀 그리드
+  html += `<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px">`;
+  for (let i = 0; i < firstDay; i++) html += '<div></div>';
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const amt   = dayTotals[d] || 0;
+    const ratio = amt > 0 ? amt / maxAmt : 0;
+    const isToday = isThisMonth && d === todayD;
+    const isSel   = state.calDay === d;
+    const hasTx   = amt > 0;
+
+    let bg, numCol, amtCol;
+    if (!hasTx) {
+      bg = 'var(--bg-inset)'; numCol = 'var(--t5)'; amtCol = 'var(--t5)';
+    } else if (ratio < 0.35) {
+      bg = isDark ? 'rgba(99,102,241,.18)' : '#EEF2FF';
+      numCol = isDark ? '#A5B4FC' : '#4338CA';
+      amtCol = isDark ? '#818CF8' : '#4338CA';
+    } else if (ratio < 0.7) {
+      bg = isDark ? 'rgba(99,102,241,.4)' : '#C7D2FE';
+      numCol = isDark ? '#E0E7FF' : '#3730A3';
+      amtCol = isDark ? '#A5B4FC' : '#3730A3';
+    } else {
+      bg = isDark ? '#4338CA' : '#4F46E5';
+      numCol = '#FFFFFF';
+      amtCol = '#C7D2FE';
+    }
+
+    const todayRing = isToday ? 'outline:2px solid #6366F1;outline-offset:-2px;' : '';
+    const selRing   = isSel   ? 'outline:2px solid #F59E0B;outline-offset:-2px;' : '';
+
+    html += `
+      <div onclick="selectCalDay(${d})"
+           style="background:${bg};border-radius:6px;padding:3px 4px;min-height:46px;cursor:pointer;${todayRing}${selRing}transition:filter .1s"
+           onmouseover="this.style.filter='brightness(.92)'" onmouseout="this.style.filter=''">
+        <div style="font-size:.625rem;font-weight:${isToday?'800':'600'};color:${numCol}">${d}</div>
+        ${hasTx ? `<div class="num" style="font-size:.5625rem;font-weight:700;color:${amtCol};margin-top:2px;line-height:1.3">${shortFmt(amt)}</div>` : ''}
+      </div>`;
+  }
+  html += '</div>';
+
+  // 선택된 날짜 상세
+  if (state.calDay) {
+    const dateStr = `${state.ym}-${pad(state.calDay)}`;
+    const dayTxs  = (dayTxMap[state.calDay] || []).sort((a,b) => a.merchant.localeCompare(b.merchant));
+    const dayTotal = dayTxs.reduce((s,t) => s + t.amount, 0);
+    html += `
+      <div style="border-top:1px solid var(--divider);padding-top:.75rem;margin-top:.625rem">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem">
+          <span style="font-size:.8125rem;font-weight:700;color:var(--t2)">${month}월 ${state.calDay}일</span>
+          <span class="num" style="font-size:.8125rem;font-weight:800;color:var(--t1)">${fmtAmt(dayTotal)}</span>
+        </div>
+        ${dayTxs.length === 0
+          ? `<p style="font-size:.75rem;color:var(--t5);text-align:center;padding:.75rem 0">내역 없음</p>`
+          : dayTxs.map(tx => `
+              <div class="divider-row" style="display:flex;justify-content:space-between;align-items:center">
+                <div>
+                  <div style="font-size:.8125rem;font-weight:600;color:var(--t2)">${tx.merchant}</div>
+                  <div style="font-size:.625rem;font-weight:600;color:${CATEGORIES[tx.category]?.color||'var(--t4)'}">${tx.category}</div>
+                </div>
+                <div class="num" style="font-size:.8125rem;font-weight:700;color:var(--t1)">${fmtAmt(tx.amount)}</div>
+              </div>`).join('')
+        }
+      </div>`;
+  }
+
+  grid.innerHTML = html;
+}
+
 /* ── 초기화 ── */
 document.addEventListener('DOMContentLoaded', () => {
   if (!localStorage.getItem(SK.KW)) saveKwMap(DEFAULT_KEYWORD_MAP);
@@ -567,10 +717,16 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 /* ── 전역 함수 등록 ── */
-window.toggleDark    = toggleDark;
-window.toggleLayout  = toggleLayout;
-window.switchTab     = switchTab;
+window.toggleDark      = toggleDark;
+window.toggleLayout    = toggleLayout;
+window.switchTab       = switchTab;
 window.switchDetailTab = switchDetailTab;
+window.switchRightTab  = switchRightTab;
+window.selectCalDay    = (d) => {
+  state.calDay = state.calDay === d ? null : d;
+  const all = JSON.parse(localStorage.getItem(SK.TX) || '{}');
+  renderCalendar(all[state.ym] || []);
+};
 
 window.handleFileSelect = (e) => { const f = e.target.files[0]; if (f) readFile(f); };
 window.handleDragOver   = (e) => { e.preventDefault(); document.getElementById('uploadZone').classList.add('drag-over'); };
@@ -660,6 +816,7 @@ window.changeMonth = (n) => {
   const [y, m] = state.ym.split('-').map(Number);
   const d = new Date(y, m - 1 + n, 1);
   state.ym = `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
+  state.calDay = null;
   renderDashboard();
 };
 window.openSampleModal = () => {
