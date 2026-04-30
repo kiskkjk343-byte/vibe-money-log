@@ -174,3 +174,5 @@ html.pc-mode .dash-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1r
 .btn-icon:hover { background: var(--bg-raised); }
 
 .fade-out { opacity: 0; transition: opacity .3s; }
+
+.hide-scrollbar::-webkit-scrollbar { display: none; }

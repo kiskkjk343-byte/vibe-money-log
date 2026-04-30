@@ -20,7 +20,7 @@ const CAT_GROUPS_FOR_TABS = {
   '기타':      ['기타'],
 };
 
-const SK = { TX: 'vml_transactions', KW: 'vml_keyword_map', DARK: 'vml_dark', LAYOUT: 'vml_layout', FIXED: 'vml_fixed', FIXED_APPLIED: 'vml_fixed_applied' };
+const SK = { TX: 'vml_transactions', KW: 'vml_keyword_map', DARK: 'vml_dark', LAYOUT: 'vml_layout', FIXED: 'vml_fixed', INCOME: 'vml_income' };
 
 const state = {
   ym: `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`,
@@ -45,10 +45,10 @@ const getPrevYM = (ym) => {
 };
 const getKwMap  = () => JSON.parse(localStorage.getItem(SK.KW) || '{}');
 const saveKwMap = m => localStorage.setItem(SK.KW, JSON.stringify(m));
-const getFixed  = () => JSON.parse(localStorage.getItem(SK.FIXED) || '[]');
-const saveFixed = arr => localStorage.setItem(SK.FIXED, JSON.stringify(arr));
-const getFixedApplied  = () => JSON.parse(localStorage.getItem(SK.FIXED_APPLIED) || '{}');
-const saveFixedApplied = obj => localStorage.setItem(SK.FIXED_APPLIED, JSON.stringify(obj));
+const getFixed   = () => JSON.parse(localStorage.getItem(SK.FIXED)  || '[]');
+const saveFixed  = arr => localStorage.setItem(SK.FIXED, JSON.stringify(arr));
+const getIncome  = () => JSON.parse(localStorage.getItem(SK.INCOME) || '[]');
+const saveIncome = arr => localStorage.setItem(SK.INCOME, JSON.stringify(arr));
 const saveMth   = (ym, data) => {
   const all = JSON.parse(localStorage.getItem(SK.TX) || '{}');
   all[ym] = data;
@@ -352,6 +352,7 @@ function switchTab(tab) {
   if (tab === 'dashboard') renderDashboard();
   if (tab === 'keywords')  renderKeywords();
   if (tab === 'fixed')     renderFixed();
+  if (tab === 'income')    renderIncome();
   refreshIcons();
 }
 
@@ -391,7 +392,16 @@ function renderDashboard() {
   document.getElementById('totalAmount').textContent = fmtAmt(total);
   document.getElementById('monthLabel').textContent  = fmtYM(state.ym);
   const txCountEl = document.getElementById('txCount');
-  if (txCountEl) txCountEl.textContent = `${active.length}건`;
+  if (txCountEl) {
+    const incomeTotal = getIncome().reduce((s, i) => s + i.amount, 0);
+    if (incomeTotal > 0 && total > 0) {
+      const ratio = Math.round(total / incomeTotal * 100);
+      const col = ratio > 80 ? '#EF4444' : ratio > 50 ? '#F59E0B' : '#10B981';
+      txCountEl.innerHTML = `${active.length}건 &nbsp;·&nbsp; 수입 대비 <span style="color:${col};font-weight:700">${ratio}%</span> 지출`;
+    } else {
+      txCountEl.textContent = `${active.length}건`;
+    }
+  }
 
   const badge = document.getElementById('momBadge');
   if (prevTotal > 0) {
@@ -570,70 +580,80 @@ function openCategoryModal(idx) {
 
 function closeModal() { document.getElementById('categoryModal').classList.add('hidden'); }
 
-/* ── 고정지출 설정 ── */
+/* ── 고정지출 계획 ── */
 function renderFixed() {
-  const list = getFixed();
+  const list  = getFixed();
+  const total = list.reduce((s, i) => s + i.amount, 0);
 
-  // 카테고리 셀렉트 초기화 (고정지출 기본 선택)
+  // 카테고리 셀렉트
   const sel = document.getElementById('fixedCategory');
-  if (sel) {
-    sel.innerHTML = Object.keys(CATEGORIES).map(c =>
-      `<option value="${c}"${c === '고정지출' ? ' selected' : ''}>${c}</option>`
-    ).join('');
+  if (sel) sel.innerHTML = Object.keys(CATEGORIES).map(c =>
+    `<option value="${c}"${c === '고정지출' ? ' selected' : ''}>${c}</option>`
+  ).join('');
+
+  // 히어로 총액
+  const totalEl = document.getElementById('fixedTotalAmt');
+  if (totalEl) totalEl.textContent = fmtAmt(total);
+  const countEl = document.getElementById('fixedCount');
+  if (countEl) countEl.textContent = `${list.length}건`;
+
+  // 카테고리 비중 바
+  const bdEl = document.getElementById('fixedBreakdown');
+  if (bdEl) {
+    if (list.length === 0) {
+      bdEl.innerHTML = `<p style="font-size:.75rem;color:var(--t5);text-align:center;padding:.5rem 0">항목을 추가하면 비중이 표시됩니다</p>`;
+    } else {
+      const byCat = {};
+      for (const item of list) byCat[item.category] = (byCat[item.category] || 0) + item.amount;
+      const sorted = Object.entries(byCat).sort((a, b) => b[1] - a[1]);
+      bdEl.innerHTML = sorted.map(([cat, amt]) => {
+        const pct  = Math.round(amt / total * 100);
+        const info = CATEGORIES[cat] || { color:'#94A3B8' };
+        return `
+          <div style="margin-bottom:.625rem">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.25rem">
+              <div style="display:flex;align-items:center;gap:.375rem">
+                <span style="width:.375rem;height:.375rem;border-radius:50%;background:${info.color};flex-shrink:0"></span>
+                <span style="font-size:.75rem;color:var(--t2);font-weight:600">${cat}</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:.75rem">
+                <span class="num" style="font-size:.75rem;font-weight:700;color:var(--t2)">${fmtAmt(amt)}</span>
+                <span class="num" style="font-size:.6875rem;color:var(--t4);min-width:2rem;text-align:right">${pct}%</span>
+              </div>
+            </div>
+            <div style="background:var(--bg-inset);border-radius:9999px;height:5px;overflow:hidden">
+              <div style="background:${info.color};height:100%;border-radius:9999px;width:${pct}%"></div>
+            </div>
+          </div>`;
+      }).join('');
+    }
   }
 
-  // 등록 목록
+  // 항목 목록
   const container = document.getElementById('fixedList');
   if (container) {
     if (list.length === 0) {
-      container.innerHTML = `
-        <div class="card" style="text-align:center;padding:1.75rem;color:var(--t5);font-size:.8125rem">
-          등록된 고정지출이 없습니다.<br>
-          <span style="font-size:.6875rem">위 폼에서 항목을 추가해보세요.</span>
-        </div>`;
+      container.innerHTML = `<p style="font-size:.8125rem;color:var(--t5);text-align:center;padding:.75rem 0">아직 등록된 항목이 없습니다</p>`;
     } else {
-      const total = list.reduce((s, i) => s + i.amount, 0);
       container.innerHTML = list.map(item => {
         const info = CATEGORIES[item.category] || { color:'#94A3B8' };
+        const pct  = total > 0 ? Math.round(item.amount / total * 100) : 0;
         return `
-          <div class="card" style="padding:.75rem 1rem;display:flex;align-items:center;gap:.75rem">
-            <span style="width:.4rem;height:.4rem;border-radius:50%;background:${info.color};flex-shrink:0"></span>
-            <div style="flex:1;min-width:0;overflow:hidden">
+          <div class="divider-row" style="display:flex;align-items:center;gap:.625rem">
+            <span style="width:.375rem;height:.375rem;border-radius:50%;background:${info.color};flex-shrink:0"></span>
+            <div style="flex:1;min-width:0">
               <div style="font-size:.875rem;font-weight:700;color:var(--t1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${item.name}</div>
-              <div style="font-size:.6875rem;color:${info.color};font-weight:600;margin-top:.1rem">${item.category}</div>
+              <div style="font-size:.6875rem;font-weight:600;color:${info.color}">${item.category}</div>
             </div>
-            <div class="num" style="font-size:.9375rem;font-weight:800;color:var(--t1);flex-shrink:0">${fmtAmt(item.amount)}</div>
+            <span class="num" style="font-size:.875rem;font-weight:800;color:var(--t1);flex-shrink:0">${fmtAmt(item.amount)}</span>
+            <span class="num" style="font-size:.625rem;color:var(--t5);min-width:1.75rem;text-align:right">${pct}%</span>
             <button onclick="removeFixed('${item.id}')"
-              style="color:var(--t5);background:none;border:none;cursor:pointer;padding:.25rem;border-radius:.375rem;flex-shrink:0;transition:color .15s;display:flex;align-items:center"
+              style="color:var(--t5);background:none;border:none;cursor:pointer;padding:.25rem;border-radius:.375rem;flex-shrink:0;display:flex;align-items:center;transition:color .15s"
               onmouseover="this.style.color='#EF4444'" onmouseout="this.style.color='var(--t5)'">
               <i data-lucide="trash-2" style="width:14px;height:14px"></i>
             </button>
           </div>`;
-      }).join('') + `
-        <div style="display:flex;justify-content:flex-end;padding:.25rem .25rem 0">
-          <span class="num" style="font-size:.75rem;color:var(--t4)">월 합계 <strong style="color:var(--t2)">${fmtAmt(total)}</strong></span>
-        </div>`;
-    }
-  }
-
-  // 이번 달 불러오기 카드
-  const applyCard = document.getElementById('fixedApplyCard');
-  const applyDesc = document.getElementById('fixedApplyDesc');
-  const applyBtn  = document.getElementById('fixedApplyBtn');
-  if (applyCard) {
-    if (list.length === 0) {
-      applyCard.classList.add('hidden');
-    } else {
-      applyCard.classList.remove('hidden');
-      const applied = getFixedApplied();
-      const total   = list.reduce((s, i) => s + i.amount, 0);
-      if (applied[state.ym]) {
-        applyDesc.textContent = `${fmtYM(state.ym)} 이미 적용됨 · ${list.length}건 · 총 ${fmtAmt(total)}`;
-        if (applyBtn) { applyBtn.textContent = '다시 불러오기'; applyBtn.style.background = '#64748B'; }
-      } else {
-        applyDesc.textContent = `${fmtYM(state.ym)} · ${list.length}건 · 총 ${fmtAmt(total)} 추가됩니다`;
-        if (applyBtn) { applyBtn.textContent = '불러오기'; applyBtn.style.background = '#4F46E5'; }
-      }
+      }).join('');
     }
   }
 
@@ -666,37 +686,109 @@ window.removeFixed = (id) => {
   );
 };
 
-window.applyFixedToMonth = () => {
-  const list = getFixed();
-  if (list.length === 0) return;
-  const applied  = getFixedApplied();
-  const total    = list.reduce((s, i) => s + i.amount, 0);
-  const isRepeat = !!applied[state.ym];
+/* ── 수입 설정 ── */
+function renderIncome() {
+  const incList  = getIncome();
+  const fixList  = getFixed();
+  const incTotal = incList.reduce((s, i) => s + i.amount, 0);
+  const fixTotal = fixList.reduce((s, i) => s + i.amount, 0);
+
+  const totalEl = document.getElementById('incomeTotalAmt');
+  if (totalEl) totalEl.textContent = fmtAmt(incTotal);
+  const countEl = document.getElementById('incomeCount');
+  if (countEl) countEl.textContent = `${incList.length}건`;
+
+  // 수입 vs 고정지출 비교 바
+  const vsEl = document.getElementById('incomeVsFixed');
+  if (vsEl) {
+    if (incTotal === 0) {
+      vsEl.innerHTML = `<p style="font-size:.75rem;color:var(--t5);text-align:center;padding:.5rem 0">수입을 추가하면 분석이 표시됩니다</p>`;
+    } else {
+      const fixPct = Math.min(Math.round(fixTotal / incTotal * 100), 100);
+      const disposable = incTotal - fixTotal;
+      const dColor = disposable >= 0 ? '#10B981' : '#EF4444';
+      vsEl.innerHTML = `
+        <div style="margin-bottom:.5rem">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.25rem">
+            <span style="font-size:.75rem;font-weight:600;color:var(--t2)">월 수입</span>
+            <span class="num" style="font-size:.75rem;font-weight:700;color:var(--t2)">${fmtAmt(incTotal)}</span>
+          </div>
+          <div style="background:var(--bg-inset);border-radius:9999px;height:6px">
+            <div style="background:#10B981;height:100%;border-radius:9999px;width:100%"></div>
+          </div>
+        </div>
+        ${fixTotal > 0 ? `
+        <div style="margin-bottom:.875rem">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.25rem">
+            <span style="font-size:.75rem;font-weight:600;color:var(--t2)">고정 지출</span>
+            <div style="display:flex;align-items:center;gap:.5rem">
+              <span class="num" style="font-size:.75rem;font-weight:700;color:var(--t2)">${fmtAmt(fixTotal)}</span>
+              <span class="num" style="font-size:.625rem;color:var(--t4)">${fixPct}%</span>
+            </div>
+          </div>
+          <div style="background:var(--bg-inset);border-radius:9999px;height:6px;overflow:hidden">
+            <div style="background:#EF4444;height:100%;border-radius:9999px;width:${fixPct}%"></div>
+          </div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:.625rem .875rem;background:var(--bg-inset);border-radius:.75rem">
+          <span style="font-size:.75rem;font-weight:700;color:var(--t2)">여유 자금 예상</span>
+          <span class="num" style="font-size:.9375rem;font-weight:800;color:${dColor}">${disposable >= 0 ? '' : '−'}${fmtAmt(Math.abs(disposable))}</span>
+        </div>` : ''}`;
+    }
+  }
+
+  // 수입 항목 목록
+  const container = document.getElementById('incomeList');
+  if (container) {
+    if (incList.length === 0) {
+      container.innerHTML = `<p style="font-size:.8125rem;color:var(--t5);text-align:center;padding:.75rem 0">아직 등록된 수입이 없습니다</p>`;
+    } else {
+      container.innerHTML = incList.map(item => `
+        <div class="divider-row" style="display:flex;align-items:center;gap:.625rem">
+          <span style="width:.375rem;height:.375rem;border-radius:50%;background:#10B981;flex-shrink:0"></span>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:.875rem;font-weight:700;color:var(--t1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${item.name}</div>
+            ${item.day ? `<div style="font-size:.6875rem;color:var(--t4)">매월 ${item.day}일 입금</div>` : '<div style="font-size:.6875rem;color:var(--t5)">입금일 미설정</div>'}
+          </div>
+          <span class="num" style="font-size:.875rem;font-weight:800;color:#10B981;flex-shrink:0">+${fmtAmt(item.amount)}</span>
+          <button onclick="removeIncome('${item.id}')"
+            style="color:var(--t5);background:none;border:none;cursor:pointer;padding:.25rem;border-radius:.375rem;flex-shrink:0;display:flex;align-items:center;transition:color .15s"
+            onmouseover="this.style.color='#EF4444'" onmouseout="this.style.color='var(--t5)'">
+            <i data-lucide="trash-2" style="width:14px;height:14px"></i>
+          </button>
+        </div>
+      `).join('');
+    }
+  }
+
+  refreshIcons();
+}
+
+window.addIncome = () => {
+  const name   = document.getElementById('incomeName').value.trim();
+  const amtRaw = document.getElementById('incomeAmount').value.trim();
+  const dayRaw = document.getElementById('incomeDay').value.trim();
+  if (!name) { showToast('항목명을 입력해주세요.'); return; }
+  const amount = parseInt(amtRaw.replace(/[^0-9]/g, ''));
+  if (!amount || amount <= 0) { showToast('금액을 올바르게 입력해주세요.'); return; }
+  const day = dayRaw ? Math.min(31, Math.max(1, parseInt(dayRaw))) : null;
+  const list = getIncome();
+  list.push({ id: genId(), name, amount, day });
+  saveIncome(list);
+  document.getElementById('incomeName').value   = '';
+  document.getElementById('incomeAmount').value = '';
+  document.getElementById('incomeDay').value    = '';
+  renderIncome();
+  showToast(`${name} 추가됨 ✓`);
+};
+
+window.removeIncome = (id) => {
+  const item = getIncome().find(i => i.id === id);
   showConfirm(
-    `${fmtYM(state.ym)} 고정지출 추가`,
-    isRepeat
-      ? `이미 적용된 달입니다. 중복 추가됩니다. 계속하시겠습니까?\n(${list.length}건 · 총 ${fmtAmt(total)})`
-      : `${list.length}건 · 총 ${fmtAmt(total)}을 이번 달 내역에 추가합니다.`,
-    () => {
-      const all = JSON.parse(localStorage.getItem(SK.TX) || '{}');
-      const newTxs = list.map(item => ({
-        id: genId(),
-        date: `${state.ym}-01`,
-        merchant: item.name,
-        amount: item.amount,
-        category: item.category,
-        isInstallment: false,
-        isCancelled: false,
-      }));
-      all[state.ym] = [...(all[state.ym] || []), ...newTxs];
-      localStorage.setItem(SK.TX, JSON.stringify(all));
-      applied[state.ym] = true;
-      saveFixedApplied(applied);
-      renderFixed();
-      showToast(`${list.length}건 추가됨 ✓`);
-    },
-    isRepeat ? '중복 추가' : '추가',
-    '#4F46E5'
+    `${item?.name || '항목'} 삭제`,
+    '이 수입 항목을 삭제하시겠습니까?',
+    () => { saveIncome(getIncome().filter(i => i.id !== id)); renderIncome(); },
+    '삭제', '#EF4444'
   );
 };
 
