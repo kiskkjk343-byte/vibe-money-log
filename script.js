@@ -1002,7 +1002,7 @@ function renderFixed() {
         const info = CATEGORIES[item.category] || { color:'#94A3B8' };
         const pct  = total > 0 ? Math.round(item.amount / total * 100) : 0;
         return `
-          <div class="divider-row" style="display:flex;align-items:center;gap:.625rem">
+          <div id="fixedRow-${item.id}" class="divider-row" style="display:flex;align-items:center;gap:.625rem">
             <span style="width:.375rem;height:.375rem;border-radius:50%;background:${info.color};flex-shrink:0"></span>
             <div style="flex:1;min-width:0">
               <div style="font-size:.875rem;font-weight:700;color:var(--t1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${item.name}</div>
@@ -1010,10 +1010,15 @@ function renderFixed() {
             </div>
             <span class="num" style="font-size:.875rem;font-weight:800;color:var(--t1);flex-shrink:0">${fmtAmt(item.amount)}</span>
             <span class="num" style="font-size:.625rem;color:var(--t5);min-width:1.75rem;text-align:right">${pct}%</span>
-            <button onclick="removeFixed('${item.id}')"
+            <button onclick="editFixed('${item.id}')" title="수정"
+              style="color:var(--t5);background:none;border:none;cursor:pointer;padding:.25rem;border-radius:.375rem;flex-shrink:0;display:flex;align-items:center;transition:color .15s"
+              onmouseover="this.style.color='var(--t1)'" onmouseout="this.style.color='var(--t5)'">
+              <i data-lucide="pencil" style="width:13px;height:13px"></i>
+            </button>
+            <button onclick="removeFixed('${item.id}')" title="삭제"
               style="color:var(--t5);background:none;border:none;cursor:pointer;padding:.25rem;border-radius:.375rem;flex-shrink:0;display:flex;align-items:center;transition:color .15s"
               onmouseover="this.style.color='#EF4444'" onmouseout="this.style.color='var(--t5)'">
-              <i data-lucide="trash-2" style="width:14px;height:14px"></i>
+              <i data-lucide="trash-2" style="width:13px;height:13px"></i>
             </button>
           </div>`;
       }).join('');
@@ -1047,6 +1052,47 @@ window.removeFixed = (id) => {
     () => { saveFixed(getFixed().filter(i => i.id !== id)); renderFixed(); },
     '삭제', '#EF4444'
   );
+};
+
+window.editFixed = (id) => {
+  const item = getFixed().find(i => i.id === id);
+  if (!item) return;
+  const row = document.getElementById(`fixedRow-${id}`);
+  if (!row) return;
+  row.style.alignItems = 'flex-start';
+  row.style.paddingTop = '.5rem';
+  row.style.paddingBottom = '.5rem';
+  row.innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:.5rem;width:100%">
+      <div style="display:flex;gap:.5rem">
+        <input id="feN-${id}" class="app-input" value="${item.name.replace(/"/g,'&quot;')}"
+          style="flex:1;padding:.45rem .625rem;font-size:.8125rem" placeholder="항목명">
+        <input id="feA-${id}" class="app-input" value="${item.amount}"
+          style="width:7rem;padding:.45rem .625rem;font-size:.8125rem;text-align:right" placeholder="금액">
+      </div>
+      <div style="display:flex;gap:.375rem;align-items:center">
+        <select id="feC-${id}" class="app-input" style="flex:1;padding:.45rem .625rem;font-size:.8125rem">
+          ${Object.keys(CATEGORIES).map(c => `<option value="${c}"${c === item.category ? ' selected' : ''}>${c}</option>`).join('')}
+        </select>
+        <button onclick="saveFixedEdit('${id}')" class="btn-sm">저장</button>
+        <button onclick="renderFixed()"
+          style="font-size:.75rem;font-weight:600;color:var(--t3);background:none;border:none;cursor:pointer;padding:.45rem .5rem;border-radius:.625rem;transition:background .15s"
+          onmouseover="this.style.background='var(--bg-raised)'" onmouseout="this.style.background='none'">취소</button>
+      </div>
+    </div>`;
+  document.getElementById(`feN-${id}`)?.focus();
+};
+
+window.saveFixedEdit = (id) => {
+  const name   = document.getElementById(`feN-${id}`)?.value.trim();
+  const amtRaw = document.getElementById(`feA-${id}`)?.value.trim();
+  const cat    = document.getElementById(`feC-${id}`)?.value;
+  if (!name) { showToast('항목명을 입력해주세요.'); return; }
+  const amount = parseInt(amtRaw.replace(/[^0-9]/g, ''));
+  if (!amount || amount <= 0) { showToast('금액을 올바르게 입력해주세요.'); return; }
+  saveFixed(getFixed().map(i => i.id === id ? { ...i, name, amount, category: cat } : i));
+  renderFixed();
+  showToast(`${name} 수정됨 ✓`);
 };
 
 /* ── 수입 설정 ── */
@@ -1107,17 +1153,22 @@ function renderIncome() {
       container.innerHTML = `<p style="font-size:.8125rem;color:var(--t5);text-align:center;padding:.75rem 0">아직 등록된 수입이 없습니다</p>`;
     } else {
       container.innerHTML = incList.map(item => `
-        <div class="divider-row" style="display:flex;align-items:center;gap:.625rem">
+        <div id="incomeRow-${item.id}" class="divider-row" style="display:flex;align-items:center;gap:.625rem">
           <span style="width:.375rem;height:.375rem;border-radius:50%;background:var(--color-income);flex-shrink:0"></span>
           <div style="flex:1;min-width:0">
             <div style="font-size:.875rem;font-weight:700;color:var(--t1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${item.name}</div>
             ${item.day ? `<div style="font-size:.6875rem;color:var(--t4)">매월 ${item.day}일 입금</div>` : '<div style="font-size:.6875rem;color:var(--t5)">입금일 미설정</div>'}
           </div>
           <span class="num" style="font-size:.875rem;font-weight:800;color:var(--color-income);flex-shrink:0">+${fmtAmt(item.amount)}</span>
-          <button onclick="removeIncome('${item.id}')"
+          <button onclick="editIncome('${item.id}')" title="수정"
+            style="color:var(--t5);background:none;border:none;cursor:pointer;padding:.25rem;border-radius:.375rem;flex-shrink:0;display:flex;align-items:center;transition:color .15s"
+            onmouseover="this.style.color='var(--t1)'" onmouseout="this.style.color='var(--t5)'">
+            <i data-lucide="pencil" style="width:13px;height:13px"></i>
+          </button>
+          <button onclick="removeIncome('${item.id}')" title="삭제"
             style="color:var(--t5);background:none;border:none;cursor:pointer;padding:.25rem;border-radius:.375rem;flex-shrink:0;display:flex;align-items:center;transition:color .15s"
             onmouseover="this.style.color='#EF4444'" onmouseout="this.style.color='var(--t5)'">
-            <i data-lucide="trash-2" style="width:14px;height:14px"></i>
+            <i data-lucide="trash-2" style="width:13px;height:13px"></i>
           </button>
         </div>
       `).join('');
@@ -1153,6 +1204,48 @@ window.removeIncome = (id) => {
     () => { saveIncome(getIncome().filter(i => i.id !== id)); renderIncome(); },
     '삭제', '#EF4444'
   );
+};
+
+window.editIncome = (id) => {
+  const item = getIncome().find(i => i.id === id);
+  if (!item) return;
+  const row = document.getElementById(`incomeRow-${id}`);
+  if (!row) return;
+  row.style.alignItems = 'flex-start';
+  row.style.paddingTop = '.5rem';
+  row.style.paddingBottom = '.5rem';
+  row.innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:.5rem;width:100%">
+      <div style="display:flex;gap:.5rem">
+        <input id="ieN-${id}" class="app-input" value="${item.name.replace(/"/g,'&quot;')}"
+          style="flex:1;padding:.45rem .625rem;font-size:.8125rem" placeholder="항목명">
+        <input id="ieA-${id}" class="app-input" value="${item.amount}"
+          style="width:7rem;padding:.45rem .625rem;font-size:.8125rem;text-align:right" placeholder="금액">
+      </div>
+      <div style="display:flex;gap:.375rem;align-items:center">
+        <input id="ieD-${id}" class="app-input" type="number" min="1" max="31"
+          value="${item.day || ''}" placeholder="입금일 (선택)"
+          style="flex:1;padding:.45rem .625rem;font-size:.8125rem">
+        <button onclick="saveIncomeEdit('${id}')" class="btn-sm">저장</button>
+        <button onclick="renderIncome()"
+          style="font-size:.75rem;font-weight:600;color:var(--t3);background:none;border:none;cursor:pointer;padding:.45rem .5rem;border-radius:.625rem;transition:background .15s"
+          onmouseover="this.style.background='var(--bg-raised)'" onmouseout="this.style.background='none'">취소</button>
+      </div>
+    </div>`;
+  document.getElementById(`ieN-${id}`)?.focus();
+};
+
+window.saveIncomeEdit = (id) => {
+  const name   = document.getElementById(`ieN-${id}`)?.value.trim();
+  const amtRaw = document.getElementById(`ieA-${id}`)?.value.trim();
+  const dayRaw = document.getElementById(`ieD-${id}`)?.value.trim();
+  if (!name) { showToast('항목명을 입력해주세요.'); return; }
+  const amount = parseInt(amtRaw.replace(/[^0-9]/g, ''));
+  if (!amount || amount <= 0) { showToast('금액을 올바르게 입력해주세요.'); return; }
+  const day = dayRaw ? parseInt(dayRaw) : null;
+  saveIncome(getIncome().map(i => i.id === id ? { ...i, name, amount, day } : i));
+  renderIncome();
+  showToast(`${name} 수정됨 ✓`);
 };
 
 /* ── 캘린더 뷰 ── */
