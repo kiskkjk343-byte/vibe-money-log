@@ -20,7 +20,9 @@ const CAT_GROUPS_FOR_TABS = {
   '기타':      ['기타'],
 };
 
-const SK = { TX: 'vml_transactions', KW: 'vml_keyword_map', DARK: 'vml_dark', LAYOUT: 'vml_layout', FIXED: 'vml_fixed', INCOME: 'vml_income' };
+const SK = { TX: 'vml_transactions', KW: 'vml_keyword_map', DARK: 'vml_dark', LAYOUT: 'vml_layout', FIXED: 'vml_fixed', INCOME: 'vml_income', MEMBERS: 'vml_members' };
+
+const MEMBER_COLORS = ['#6366F1','#EC4899','#10B981','#F59E0B','#14B8A6','#8B5CF6','#EF4444','#F97316'];
 
 const state = {
   ym: `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`,
@@ -31,6 +33,8 @@ const state = {
   detailTab: '전체',
   rightTab: 'list',
   calDay: null,
+  activeMember: 'all',
+  inputMember:  null,
 };
 
 /* ── 유틸리티 ── */
@@ -47,8 +51,10 @@ const getKwMap  = () => JSON.parse(localStorage.getItem(SK.KW) || '{}');
 const saveKwMap = m => localStorage.setItem(SK.KW, JSON.stringify(m));
 const getFixed   = () => JSON.parse(localStorage.getItem(SK.FIXED)  || '[]');
 const saveFixed  = arr => localStorage.setItem(SK.FIXED, JSON.stringify(arr));
-const getIncome  = () => JSON.parse(localStorage.getItem(SK.INCOME) || '[]');
-const saveIncome = arr => localStorage.setItem(SK.INCOME, JSON.stringify(arr));
+const getIncome   = () => JSON.parse(localStorage.getItem(SK.INCOME)   || '[]');
+const saveIncome  = arr => localStorage.setItem(SK.INCOME, JSON.stringify(arr));
+const getMembers  = () => JSON.parse(localStorage.getItem(SK.MEMBERS)  || '[]');
+const saveMembers = arr => localStorage.setItem(SK.MEMBERS, JSON.stringify(arr));
 const saveMth   = (ym, data) => {
   const all = JSON.parse(localStorage.getItem(SK.TX) || '{}');
   all[ym] = data;
@@ -75,11 +81,275 @@ const DEFAULT_KEYWORD_MAP = {
   '마이리얼트립':'기타','경복궁면세점':'기타','풀무원푸드앤컬처':'기타','마이뱅크':'기타','유전젤':'기타',
 };
 
+const BUILTIN_KEYWORD_MAP = {
+  // ── 식비: 커피·음료 체인 ──────────────────────────────────────
+  '스타벅스':'식비','이디야':'식비','메가MGC커피':'식비','메가커피':'식비',
+  '컴포즈커피':'식비','컴포즈':'식비','빽다방':'식비','커피빈':'식비',
+  '투썸플레이스':'식비','투썸':'식비','할리스':'식비','탐앤탐스':'식비',
+  '엔제리너스':'식비','파스쿠찌':'식비','카페베네':'식비','폴바셋':'식비',
+  '드롭탑':'식비','달콤커피':'식비','더벤티':'식비','하삼동커피':'식비',
+  '커핀그루나루':'식비','블루보틀':'식비','공차':'식비','쥬씨':'식비',
+  '스무디킹':'식비','요거프레소':'식비','더착한커피':'식비','빈스앤베리즈':'식비',
+  '감성커피':'식비','매머드커피':'식비','빅오렌지':'식비','커피스미스':'식비',
+  '커피베이':'식비','프랭커피':'식비','테일러커피':'식비','앤트러사이트':'식비',
+  '모모스커피':'식비','커피나무':'식비','자바시티':'식비','뉴욕커피':'식비',
+  '요아정':'식비','소프트리':'식비','콜드스톤':'식비',
+  // 식비: 패스트푸드·버거
+  '맥도날드':'식비','버거킹':'식비','KFC':'식비','롯데리아':'식비',
+  '맘스터치':'식비','서브웨이':'식비','파이브가이즈':'식비','쉐이크쉑':'식비',
+  '노브랜드버거':'식비','크라이치즈버거':'식비','슈퍼두퍼':'식비',
+  '타코벨':'식비','프랭크버거':'식비','다운타우너':'식비','버거플랜트':'식비',
+  // 식비: 피자
+  '피자헛':'식비','도미노피자':'식비','도미노':'식비','파파존스':'식비',
+  '미스터피자':'식비','반올림피자':'식비','7번가피자':'식비',
+  '피자스쿨':'식비','피자마루':'식비','피자나라치킨공주':'식비',
+  '피자알볼로':'식비','피자에땅':'식비','오구쌀피자':'식비','고피자':'식비',
+  // 식비: 치킨
+  '교촌치킨':'식비','교촌':'식비','BHC':'식비','BBQ':'식비',
+  '굽네치킨':'식비','굽네':'식비','네네치킨':'식비','처갓집':'식비',
+  '멕시카나':'식비','호식이두마리치킨':'식비','호식이':'식비',
+  '페리카나':'식비','60계치킨':'식비','푸라닭':'식비',
+  '노랑통닭':'식비','지코바치킨':'식비','지코바':'식비',
+  '훌랄라':'식비','땅땅치킨':'식비','두찜':'식비','봉구스밥버거':'식비',
+  '또래오래':'식비','쌈바닭':'식비','자담치킨':'식비','치킨마루':'식비',
+  '부어치킨':'식비','강호동백정':'식비','옛날통닭':'식비','쌀통닭':'식비',
+  '치킨플러스':'식비','닭이랑':'식비','맥켄치킨':'식비','치킨매니아':'식비',
+  // 식비: 배달 플랫폼
+  '배달의민족':'식비','배민':'식비','요기요':'식비','쿠팡이츠':'식비',
+  '위메프오':'식비','땡겨요':'식비',
+  // 식비: 한식·외식·도시락·베이커리 체인
+  '빕스':'식비','아웃백':'식비','한솥':'식비','본죽':'식비','본도시락':'식비',
+  '애슐리퀸즈':'식비','애슐리':'식비','올반':'식비','CJ푸드빌':'식비',
+  '뚜레쥬르':'식비','파리바게뜨':'식비','파리바게트':'식비',
+  '던킨':'식비','크리스피크림':'식비','배스킨라빈스':'식비','나뚜루':'식비',
+  '설빙':'식비','망고식스':'식비','리나스':'식비','성심당':'식비','브레댄코':'식비',
+  '에그드랍':'식비','이삭토스트':'식비','고봉민김밥':'식비',
+  '김가네':'식비','바르다김선생':'식비','한촌설렁탕':'식비','신선설농탕':'식비',
+  '신전떡볶이':'식비','죠스떡볶이':'식비','엽기떡볶이':'식비','국대떡볶이':'식비',
+  '배떡':'식비','떡볶이의신':'식비','아딸':'식비','선비꼬마김밥':'식비',
+  '김밥천국':'식비','원할머니보쌈':'식비','놀부부대찌개':'식비','청년다방':'식비',
+  '셰프의테이블':'식비','오봉도시락':'식비','한국맥도날드':'식비',
+  '명륜진사갈비':'식비','하남돼지집':'식비','서가앤쿡':'식비','삼겹본능':'식비',
+  '연안식당':'식비','큰맘할매순대국':'식비','흥부찜닭':'식비','땅스부대찌개':'식비',
+  '홍콩반점0410':'식비','홍콩반점':'식비','차이나팩토리':'식비',
+  '스시로':'식비','요시노야':'식비','마루가메제면':'식비',
+  '매드포갈릭':'식비','블랙스미스':'식비','계절밥상':'식비',
+  '제일제면소':'식비','국수나무':'식비','명동칼국수':'식비',
+  '롤링파스타':'식비','빠네파스타':'식비',
+  // 식비: 편의점
+  'GS25':'식비','CU편의점':'식비','세븐일레븐':'식비','이마트24':'식비','미니스톱':'식비',
+  // 식비: 부분 매칭 패턴
+  '식당':'식비','밥집':'식비','음식점':'식비','레스토랑':'식비','포차':'식비',
+  '횟집':'식비','고기집':'식비','삼겹살':'식비','국밥':'식비','순대국':'식비',
+  '순댓국':'식비','떡볶이':'식비','분식':'식비','해장국':'식비','갈비집':'식비',
+  '갈비':'식비','곱창':'식비','막창':'식비','설렁탕':'식비','삼계탕':'식비',
+  '감자탕':'식비','보쌈':'식비','족발':'식비','초밥':'식비','스시':'식비',
+  '라멘':'식비','우동':'식비','소바':'식비','돈가스':'식비','돈까스':'식비',
+  '파스타':'식비','베이커리':'식비','카페':'식비','치킨집':'식비','닭갈비':'식비',
+  '찜닭':'식비','전골':'식비','찌개':'식비','냉면':'식비','비빔밥':'식비',
+  '덮밥':'식비','볶음밥':'식비','김밥':'식비','마라탕':'식비','훠궈':'식비',
+  '순두부':'식비','칼국수':'식비','수제비':'식비','매운탕':'식비','뷔페':'식비',
+  '이자카야':'식비','쌀국수':'식비','스테이크':'식비','바베큐':'식비',
+  '불고기':'식비','제육':'식비','연어':'식비','조개구이':'식비','해물찜':'식비',
+  '아귀찜':'식비','짜장':'식비','짬뽕':'식비','탕수육':'식비','삼겹':'식비',
+  '만두':'식비','낙지':'식비','수육':'식비','해물탕':'식비','육개장':'식비',
+  '추어탕':'식비','꽃게':'식비','대게':'식비','쌈밥':'식비','보리밥':'식비',
+  '된장찌개':'식비','청국장':'식비','해장':'식비','막국수':'식비',
+  '동태탕':'식비','꼬리곰탕':'식비','도가니탕':'식비','뼈해장국':'식비',
+  '직화구이':'식비','구이집':'식비','정육식당':'식비','한우구이':'식비',
+  '목살':'식비','항정살':'식비','꼼장어':'식비','쭈꾸미':'식비',
+  '오삼불고기':'식비','낙곱새':'식비','꽃등심':'식비','주점':'식비',
+  '선술집':'식비','호프집':'식비','치맥':'식비','와인바':'식비',
+  '일식당':'식비','중식당':'식비','한식당':'식비','양식당':'식비',
+  '태국음식':'식비','인도카레':'식비','양꼬치':'식비','딤섬':'식비',
+  '훈제':'식비','도가니':'식비','선지국':'식비','곰탕':'식비',
+  '떡국':'식비','순살':'식비','닭발':'식비','마라':'식비',
+  '빵집':'식비','도넛':'식비','와플':'식비','크로플':'식비','케이크샵':'식비',
+  '아이스크림':'식비','젤라또':'식비','빙수':'식비','팥빙수':'식비',
+  '숯불구이':'식비','회전초밥':'식비','오마카세':'식비','해산물':'식비',
+  '복어':'식비','민물고기':'식비','장어':'식비','간장게장':'식비',
+
+  // ── 교통 ─────────────────────────────────────────────────────
+  '카카오택시':'교통','카카오모빌리티':'교통','타다':'교통',
+  '우티':'교통','티맵택시':'교통','아이엠택시':'교통','반반택시':'교통',
+  'T머니':'교통','캐시비':'교통','한페이':'교통','원패스':'교통',
+  '쏘카':'교통','그린카':'교통','피플카':'교통','딜카':'교통',
+  '롯데렌터카':'교통','SK렌터카':'교통','제주렌터카':'교통',
+  '하나렌터카':'교통','카모아':'교통','카닥':'교통',
+  '대한항공':'교통','아시아나항공':'교통','아시아나':'교통',
+  '진에어':'교통','제주항공':'교통','티웨이항공':'교통','티웨이':'교통',
+  '이스타항공':'교통','에어서울':'교통','에어부산':'교통','에어프레미아':'교통',
+  '플라이강원':'교통','에어로케이':'교통',
+  '코레일':'교통','SRT':'교통',
+  'GS칼텍스':'교통','SK에너지':'교통','S-OIL':'교통','에쓰오일':'교통',
+  '현대오일뱅크':'교통','오일뱅크':'교통','알뜰주유소':'교통','농협주유소':'교통',
+  '한국도로공사':'교통','도로공사':'교통',
+  '킥고잉':'교통','씽씽':'교통','지쿠터':'교통','라임킥보드':'교통',
+  // 교통: 부분 매칭 패턴
+  '택시':'교통','지하철':'교통','철도':'교통','기차':'교통','항공':'교통',
+  '주유소':'교통','주유':'교통','주차장':'교통','하이패스':'교통',
+  '고속도로':'교통','렌터카':'교통','렌트카':'교통','통행료':'교통',
+  '충전소':'교통','모빌리티':'교통','리무진':'교통','공항버스':'교통',
+  '셔틀버스':'교통','전동킥보드':'교통','따릉이':'교통','카셰어링':'교통',
+  '경유':'교통','휘발유':'교통','차량정비':'교통','자동차정비':'교통',
+  '대리운전':'교통','발렛파킹':'교통','주차비':'교통',
+
+  // ── 쇼핑/생활 ────────────────────────────────────────────────
+  // 백화점·대형마트
+  '롯데백화점':'쇼핑/생활','신세계백화점':'쇼핑/생활','현대백화점':'쇼핑/생활',
+  'AK플라자':'쇼핑/생활','갤러리아백화점':'쇼핑/생활','갤러리아':'쇼핑/생활',
+  'NC백화점':'쇼핑/생활','이마트':'쇼핑/생활','홈플러스':'쇼핑/생활',
+  '롯데마트':'쇼핑/생활','코스트코':'쇼핑/생활','하나로마트':'쇼핑/생활',
+  'GS더프레시':'쇼핑/생활','농협하나로마트':'쇼핑/생활','메가마트':'쇼핑/생활',
+  '이마트트레이더스':'쇼핑/생활','트레이더스':'쇼핑/생활','노브랜드':'쇼핑/생활',
+  // 온라인 커머스
+  '쿠팡':'쇼핑/생활','11번가':'쇼핑/생활','G마켓':'쇼핑/생활','지마켓':'쇼핑/생활',
+  '옥션':'쇼핑/생활','위메프':'쇼핑/생활','티몬':'쇼핑/생활',
+  '롯데온':'쇼핑/생활','SSG닷컴':'쇼핑/생활','신세계몰':'쇼핑/생활',
+  '네이버쇼핑':'쇼핑/생활','네이버페이':'쇼핑/생활','카카오선물하기':'쇼핑/생활',
+  '마켓컬리':'쇼핑/생활','컬리':'쇼핑/생활','오아시스마켓':'쇼핑/생활',
+  '현대몰':'쇼핑/생활','AK몰':'쇼핑/생활','LF몰':'쇼핑/생활',
+  '알리익스프레스':'쇼핑/생활','알리바바':'쇼핑/생활','테무':'쇼핑/생활',
+  // 홈쇼핑
+  'GS홈쇼핑':'쇼핑/생활','CJ온스타일':'쇼핑/생활','롯데홈쇼핑':'쇼핑/생활',
+  '현대홈쇼핑':'쇼핑/생활','NS홈쇼핑':'쇼핑/생활','공영홈쇼핑':'쇼핑/생활',
+  // 뷰티·드럭스토어
+  '올리브영':'쇼핑/생활','다이소':'쇼핑/생활','세포라':'쇼핑/생활',
+  '아리따움':'쇼핑/생활','이니스프리':'쇼핑/생활','에뛰드':'쇼핑/생활',
+  '미샤':'쇼핑/생활','더페이스샵':'쇼핑/생활','네이처리퍼블릭':'쇼핑/생활',
+  '토니모리':'쇼핑/생활','스킨푸드':'쇼핑/생활','잇츠스킨':'쇼핑/생활',
+  '랄라블라':'쇼핑/생활','롭스':'쇼핑/생활','왓슨스':'쇼핑/생활','시코르':'쇼핑/생활',
+  '클리오':'쇼핑/생활','롬앤':'쇼핑/생활','조선미녀':'쇼핑/생활','설화수':'쇼핑/생활',
+  '헤라':'쇼핑/생활','아이오페':'쇼핑/생활','라네즈':'쇼핑/생활','VDL':'쇼핑/생활',
+  // 패션·스포츠
+  'ZARA':'쇼핑/생활','자라':'쇼핑/생활','H&M':'쇼핑/생활','에이치앤엠':'쇼핑/생활',
+  '유니클로':'쇼핑/생활','스파오':'쇼핑/생활','탑텐':'쇼핑/생활',
+  '지오다노':'쇼핑/생활','무신사':'쇼핑/생활','에이블리':'쇼핑/생활',
+  '브랜디':'쇼핑/생활','W컨셉':'쇼핑/생활','29CM':'쇼핑/생활',
+  '지그재그':'쇼핑/생활','에잇세컨즈':'쇼핑/생활','8seconds':'쇼핑/생활',
+  '크림':'쇼핑/생활','퀸잇':'쇼핑/생활',
+  '나이키':'쇼핑/생활','아디다스':'쇼핑/생활','뉴발란스':'쇼핑/생활',
+  '아식스':'쇼핑/생활','리복':'쇼핑/생활','퓨마':'쇼핑/생활','컨버스':'쇼핑/생활',
+  'MLB':'쇼핑/생활','라코스테':'쇼핑/생활','폴로':'쇼핑/생활','휠라':'쇼핑/생활',
+  '노스페이스':'쇼핑/생활','블랙야크':'쇼핑/생활','K2아웃도어':'쇼핑/생활',
+  '네파':'쇼핑/생활','밀레':'쇼핑/생활','아이더':'쇼핑/생활',
+  '코오롱스포츠':'쇼핑/생활','디스커버리익스페디션':'쇼핑/생활',
+  '프로스펙스':'쇼핑/생활','르까프':'쇼핑/생활','데상트':'쇼핑/생활',
+  'ABC마트':'쇼핑/생활','풋로커':'쇼핑/생활',
+  // 전자제품
+  '하이마트':'쇼핑/생활','전자랜드':'쇼핑/생활','삼성디지털플라자':'쇼핑/생활',
+  'LG베스트샵':'쇼핑/생활','애플스토어':'쇼핑/생활','Apple':'쇼핑/생활',
+  // 가구·인테리어·생활
+  'IKEA':'쇼핑/생활','이케아':'쇼핑/생활','한샘':'쇼핑/생활',
+  '에몬스가구':'쇼핑/생활','리바트':'쇼핑/생활','까사미아':'쇼핑/생활',
+  '현대리바트':'쇼핑/생활','퍼시스':'쇼핑/생활','일룸':'쇼핑/생활',
+  '에이스침대':'쇼핑/생활','시몬스':'쇼핑/생활','자주':'쇼핑/생활',
+  'MUJI':'쇼핑/생활','무인양품':'쇼핑/생활','모던하우스':'쇼핑/생활',
+  // 서점
+  '교보문고':'쇼핑/생활','반디앤루니스':'쇼핑/생활','영풍문고':'쇼핑/생활',
+  '알라딘':'쇼핑/생활','YES24':'쇼핑/생활','예스24':'쇼핑/생활',
+  // 문화·여가
+  'CGV':'쇼핑/생활','롯데시네마':'쇼핑/생활','메가박스':'쇼핑/생활',
+  // 헤어·미용 프랜차이즈
+  '준오헤어':'쇼핑/생활','박승철헤어스튜디오':'쇼핑/생활','이가자헤어비스':'쇼핑/생활',
+  '리안헤어':'쇼핑/생활','아도르헤어':'쇼핑/생활',
+  // 피트니스 프랜차이즈
+  '애니타임피트니스':'쇼핑/생활','스포애니':'쇼핑/생활','일레븐짐':'쇼핑/생활',
+  '커브스':'쇼핑/생활','위더스':'쇼핑/생활','메가필라테스':'쇼핑/생활',
+  '리포메필라테스':'쇼핑/생활','필라피티':'쇼핑/생활',
+  // 왁싱·네일
+  '왁스나인':'쇼핑/생활','아나덴왁싱':'쇼핑/생활',
+  // 쇼핑/생활: 부분 매칭 패턴
+  '마트':'쇼핑/생활','슈퍼마켓':'쇼핑/생활','백화점':'쇼핑/생활',
+  '쇼핑몰':'쇼핑/생활','아울렛':'쇼핑/생활','의류':'쇼핑/생활',
+  '패션':'쇼핑/생활','신발':'쇼핑/생활','운동화':'쇼핑/생활',
+  '가방':'쇼핑/생활','악세서리':'쇼핑/생활','악세사리':'쇼핑/생활',
+  '화장품':'쇼핑/생활','뷰티':'쇼핑/생활','가전제품':'쇼핑/생활',
+  '인테리어':'쇼핑/생활','가구':'쇼핑/생활','침구':'쇼핑/생활',
+  '미용실':'쇼핑/생활','헤어샵':'쇼핑/생활','헤어살롱':'쇼핑/생활',
+  '네일샵':'쇼핑/생활','네일아트':'쇼핑/생활','왁싱샵':'쇼핑/생활',
+  '속눈썹':'쇼핑/생활','눈썹':'쇼핑/생활','필라테스':'쇼핑/생활',
+  '요가':'쇼핑/생활','헬스장':'쇼핑/생활','헬스클럽':'쇼핑/생활',
+  '피트니스':'쇼핑/생활','수영장':'쇼핑/생활','스포츠센터':'쇼핑/생활',
+  '골프':'쇼핑/생활','테니스':'쇼핑/생활','스크린골프':'쇼핑/생활',
+  '노래방':'쇼핑/생활','PC방':'쇼핑/생활','볼링':'쇼핑/생활',
+  '당구장':'쇼핑/생활','탁구장':'쇼핑/생활','스키장':'쇼핑/생활',
+  '편의점':'쇼핑/생활','잡화':'쇼핑/생활','서점':'쇼핑/생활',
+  '도서':'쇼핑/생활','문구':'쇼핑/생활','영화관':'쇼핑/생활',
+  '세탁소':'쇼핑/생활','세탁':'쇼핑/생활','클리닝':'쇼핑/생활',
+  '주방용품':'쇼핑/생활','생활용품':'쇼핑/생활','위생용품':'쇼핑/생활',
+  '홈쇼핑':'쇼핑/생활','드럭스토어':'쇼핑/생활','리셀':'쇼핑/생활',
+  '스포츠용품':'쇼핑/생활','아웃도어':'쇼핑/생활',
+
+  // ── 고정지출 ─────────────────────────────────────────────────
+  // 통신사·인터넷
+  'SK텔레콤':'고정지출','SKT':'고정지출','LGU+':'고정지출',
+  'LG유플러스':'고정지출','헬로모바일':'고정지출',
+  '알뜰폰':'고정지출','스카이라이프':'고정지출','딜라이브':'고정지출',
+  'KT엠모바일':'고정지출','SK7모바일':'고정지출','리브모바일':'고정지출',
+  'SK브로드밴드':'고정지출','LG헬로비전':'고정지출',
+  // 공과금·관리
+  '한국전력':'고정지출','한전':'고정지출','도시가스':'고정지출',
+  '한국가스공사':'고정지출','수도사업소':'고정지출',
+  // 보험: 생명보험
+  '삼성생명':'고정지출','한화생명':'고정지출','교보생명':'고정지출',
+  '미래에셋생명':'고정지출','신한라이프':'고정지출','동양생명':'고정지출',
+  'NH농협생명':'고정지출','흥국생명':'고정지출','라이나생명':'고정지출',
+  'ABL생명':'고정지출','DB생명':'고정지출','메트라이프':'고정지출',
+  '푸본현대생명':'고정지출','AIA생명':'고정지출',
+  // 보험: 손해보험
+  '삼성화재':'고정지출','현대해상':'고정지출','DB손해보험':'고정지출',
+  'KB손해보험':'고정지출','KB손보':'고정지출','메리츠화재':'고정지출',
+  '한화손해보험':'고정지출','롯데손해보험':'고정지출','흥국화재':'고정지출',
+  '농협손해보험':'고정지출','MG손해보험':'고정지출','AXA손해보험':'고정지출',
+  '캐롯손해보험':'고정지출','캐롯보험':'고정지출',
+  // OTT·스트리밍
+  '넷플릭스':'고정지출','왓챠':'고정지출','웨이브':'고정지출',
+  '티빙':'고정지출','시즌':'고정지출','쿠팡플레이':'고정지출',
+  '디즈니플러스':'고정지출','애플TV+':'고정지출',
+  // 음악·미디어
+  '멜론':'고정지출','지니뮤직':'고정지출','플로':'고정지출',
+  '바이브':'고정지출','스포티파이':'고정지출','애플뮤직':'고정지출',
+  '유튜브프리미엄':'고정지출','유튜브뮤직':'고정지출',
+  // 웹툰·콘텐츠
+  '카카오페이지':'고정지출','네이버웹툰':'고정지출','시리즈온':'고정지출',
+  // 구독 서비스
+  '밀리의서재':'고정지출','리디북스':'고정지출','리디':'고정지출',
+  '교보ebook':'고정지출','북클럽':'고정지출','윌라':'고정지출',
+  '쿠팡와우':'고정지출','네이버플러스':'고정지출',
+  '어도비':'고정지출','마이크로소프트':'고정지출','구글스토리지':'고정지출',
+  '드롭박스':'고정지출','노션':'고정지출','한컴오피스':'고정지출',
+  // 교육 구독
+  '웅진씽크빅':'고정지출','대교':'고정지출','눈높이':'고정지출',
+  '빨간펜':'고정지출','윤선생':'고정지출','야나두':'고정지출',
+  '클래스101':'고정지출','콜로소':'고정지출','패스트캠퍼스':'고정지출',
+  '탈잉':'고정지출','메가스터디':'고정지출','이투스':'고정지출',
+  '해커스':'고정지출','시원스쿨':'고정지출',
+  // 고정지출: 부분 매칭 패턴
+  '관리비':'고정지출','월세':'고정지출','전기요금':'고정지출',
+  '가스요금':'고정지출','수도요금':'고정지출','통신비':'고정지출',
+  '보험료':'고정지출','구독료':'고정지출','이용료':'고정지출',
+  '월정액':'고정지출','아파트관리':'고정지출','공과금':'고정지출',
+  '연회비':'고정지출','인터넷요금':'고정지출','전기세':'고정지출',
+  '가스비':'고정지출','수도세':'고정지출','임대료':'고정지출',
+};
+
 const categorize = (merchant) => {
-  const map = getKwMap();
-  for (const [kw, cat] of Object.entries(map)) {
-    if (merchant.includes(kw)) return cat;
-  }
+  const m = merchant.toLowerCase();
+  const userMap = getKwMap();
+
+  // 사용자 키워드 우선 (더 긴 키워드가 더 구체적이므로 길이 내림차순)
+  const userMatch = Object.entries(userMap)
+    .filter(([kw]) => m.includes(kw.toLowerCase()))
+    .sort((a, b) => b[0].length - a[0].length)[0];
+  if (userMatch) return userMatch[1];
+
+  // 내장 키워드 (길이 내림차순으로 최장 일치)
+  const builtinMatch = Object.entries(BUILTIN_KEYWORD_MAP)
+    .filter(([kw]) => m.includes(kw.toLowerCase()))
+    .sort((a, b) => b[0].length - a[0].length)[0];
+  if (builtinMatch) return builtinMatch[1];
+
   return '기타';
 };
 
@@ -163,19 +433,39 @@ function parseText(raw) {
   return results.filter(tx => tx.date && tx.merchant && tx.amount > 0);
 }
 
-/* ── Excel 행 직접 파싱 (헤더 자동 감지) ── */
+/* ── CSV 텍스트 → 2D 배열 (BOM 제거 + 따옴표 필드 처리) ── */
+function parseCSVToRows(text) {
+  const clean = text.replace(/^﻿/, '');
+  const rows = [];
+  for (const line of clean.split('\n')) {
+    if (!line.trim()) continue;
+    const cells = [];
+    let cur = '', inQ = false;
+    for (const ch of line) {
+      if (ch === '"') { inQ = !inQ; }
+      else if (ch === ',' && !inQ) { cells.push(cur.trim()); cur = ''; }
+      else { cur += ch; }
+    }
+    cells.push(cur.trim());
+    rows.push(cells);
+  }
+  return rows;
+}
+
+/* ── Excel/CSV 행 직접 파싱 (헤더 자동 감지) ── */
 function parseExcelRows(rows) {
   const headerIdx = rows.findIndex(row =>
     Array.isArray(row) &&
-    row.some(c => /날짜|일자|이용일|승인일/.test(String(c))) &&
-    row.some(c => /가맹점|상호|이용처|사용처|이용내역|적요/.test(String(c)))
+    row.some(c => /날짜|일자|이용일|승인일|거래일시|거래일/.test(String(c))) &&
+    row.some(c => /가맹점|상호|이용처|사용처|이용내역|적요|거래처|내용/.test(String(c)))
   );
   if (headerIdx === -1) return null;
 
   const header = rows[headerIdx].map(c => String(c));
-  const dateCol     = header.findIndex(c => /날짜|일자|이용일|승인일/.test(c));
-  const merchantCol = header.findIndex(c => /가맹점|상호|이용처|사용처|이용내역|적요/.test(c));
+  const dateCol     = header.findIndex(c => /날짜|일자|이용일|승인일|거래일시|거래일/.test(c));
+  const merchantCol = header.findIndex(c => /가맹점|상호|이용처|사용처|이용내역|적요|거래처|내용/.test(c));
   const amountCol   = header.findIndex(c => /이용금액|사용금액|출금금액|금액/.test(c));
+  const typeCol     = header.findIndex(c => /거래종류|구분|거래유형/.test(c));
   if (merchantCol === -1) return null;
 
   const results = [];
@@ -184,7 +474,11 @@ function parseExcelRows(rows) {
     const dateRaw     = String(row[dateCol]     ?? '').trim();
     const merchantRaw = String(row[merchantCol] ?? '').trim();
     const amountRaw   = String(row[amountCol]   ?? '').trim();
+    const typeRaw     = typeCol >= 0 ? String(row[typeCol] ?? '').trim() : '';
     if (!merchantRaw) continue;
+
+    // 입금/이자 행 제외 (토스뱅크 등)
+    if (typeRaw && /입금|이자|환급/.test(typeRaw)) continue;
 
     let date = '';
     const dm = dateRaw.match(/(\d{4})[.\-\/](\d{1,2})[.\-\/](\d{1,2})/);
@@ -195,12 +489,14 @@ function parseExcelRows(rows) {
     const amountNum = parseInt(amountRaw.replace(/[^0-9\-]/g, '') || '0');
     if (amountNum === 0) continue;
 
+    const isCancelled = /취소/.test(typeRaw) || amountNum < 0;
+
     results.push({
       id: genId(), date, merchant: merchantRaw,
       amount: Math.abs(amountNum),
       category: categorize(merchantRaw),
       isInstallment: false,
-      isCancelled: amountNum < 0,
+      isCancelled,
     });
   }
   return results.length > 0 ? results : null;
@@ -285,6 +581,31 @@ const readFile = async (file) => {
     };
     reader.readAsBinaryString(file);
 
+  } else if (/\.csv$/i.test(file.name)) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        showToast('CSV 분석 중...');
+        const text = e.target.result;
+        const rows = parseCSVToRows(text);
+        const parsed = parseExcelRows(rows);
+        if (parsed) {
+          state.pending = parsed;
+          updateUI(file.name, file.size);
+          renderPreview();
+          showToast(`CSV 분석 완료 — ${parsed.length}건 ✓`);
+        } else {
+          document.getElementById('statementInput').value = text.replace(/^﻿/, '');
+          updateUI(file.name, file.size);
+          window.parseStatement();
+          showToast('CSV 분석 완료 ✓');
+        }
+      } catch (err) {
+        showToast('CSV 읽기 실패: ' + err.message);
+      }
+    };
+    reader.readAsText(file, 'UTF-8');
+
   } else {
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -350,9 +671,9 @@ function switchTab(tab) {
   const activeBtn = document.querySelector(`[data-tab="${tab}"]`);
   if (activeBtn) activeBtn.classList.add('tab-active');
   if (tab === 'dashboard') renderDashboard();
-  if (tab === 'keywords')  renderKeywords();
   if (tab === 'fixed')     renderFixed();
   if (tab === 'income')    renderIncome();
+  if (tab === 'input')     renderInputMemberSelector();
   refreshIcons();
 }
 
@@ -380,9 +701,11 @@ function renderPreview() {
 
 /* ── 대시보드 렌더링 ── */
 function renderDashboard() {
-  const all     = JSON.parse(localStorage.getItem(SK.TX) || '{}');
-  const txs     = all[state.ym]              || [];
-  const prevTxs = all[getPrevYM(state.ym)]   || [];
+  const all        = JSON.parse(localStorage.getItem(SK.TX) || '{}');
+  const allTxs     = all[state.ym]              || [];
+  const allPrevTxs = all[getPrevYM(state.ym)]   || [];
+  const txs     = state.activeMember === 'all' ? allTxs     : allTxs.filter(t => t.memberId === state.activeMember);
+  const prevTxs = state.activeMember === 'all' ? allPrevTxs : allPrevTxs.filter(t => t.memberId === state.activeMember);
 
   const active     = txs.filter(t => !t.isCancelled);
   const total      = active.reduce((s, t) => s + t.amount, 0);
@@ -422,6 +745,9 @@ function renderDashboard() {
   const clearBtn = document.getElementById('clearMonthBtn');
   if (clearBtn) clearBtn.classList.toggle('hidden', txs.length === 0);
 
+  const demoBadge = document.getElementById('demoBadge');
+  if (demoBadge) demoBadge.classList.toggle('hidden', !hasDemoData());
+
   if (state.rightTab === 'calendar') {
     const listCountEl = document.getElementById('listCount');
     if (listCountEl) listCountEl.textContent = `${active.length}건`;
@@ -429,6 +755,14 @@ function renderDashboard() {
   } else {
     renderDetailTabs();
     renderTxList(txs);
+  }
+
+  renderMemberPills(allTxs);
+  if (state.activeMember === 'all') {
+    renderMemberBreakdown(allTxs);
+  } else {
+    const bdCard = document.getElementById('memberBreakdownCard');
+    if (bdCard) bdCard.classList.add('hidden');
   }
 }
 
@@ -558,12 +892,41 @@ function renderKeywords() {
   const map = getKwMap();
   const container = document.getElementById('keywordsByCategory');
   if (!container) return;
-  container.innerHTML = Object.entries(map).map(([kw, cat]) => `
-    <div class="card" style="padding:10px;display:flex;justify-content:space-between;align-items:center;">
-      <div style="font-size:13px;"><span style="font-weight:700;">${kw}</span> → ${cat}</div>
-      <button onclick="removeKeyword('${kw}')" style="color:#EF4444;background:none;border:none;cursor:pointer;font-size:12px;">삭제</button>
+
+  const builtinCount = Object.keys(BUILTIN_KEYWORD_MAP).length;
+  const entries = Object.entries(map);
+
+  // 카테고리별 그룹핑
+  const byCat = {};
+  entries.forEach(([kw, cat]) => {
+    if (!byCat[cat]) byCat[cat] = [];
+    byCat[cat].push(kw);
+  });
+
+  const userHtml = entries.length === 0
+    ? `<p style="font-size:.8125rem;color:var(--t4);text-align:center;padding:.875rem 0">추가된 키워드가 없습니다<br><span style="font-size:.6875rem;color:var(--t5);margin-top:.25rem;display:block">키워드 추가 시 기본 분류보다 우선 적용됩니다</span></p>`
+    : Object.entries(byCat).map(([cat, kws]) => `
+        <div style="margin-bottom:.625rem">
+          <div style="font-size:.625rem;font-weight:700;color:var(--t3);letter-spacing:.06em;text-transform:uppercase;margin-bottom:.25rem">${cat}</div>
+          ${kws.map(kw => `
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:.3rem 0;border-bottom:1px solid var(--divider)">
+              <span style="font-size:.8125rem;color:var(--t1);font-weight:500">${kw}</span>
+              <button onclick="removeKeyword('${kw.replace(/'/g, "\\'")}')" style="color:var(--t4);background:none;border:none;cursor:pointer;font-size:.6875rem;padding:.2rem .5rem;border-radius:.375rem;transition:color .15s" onmouseover="this.style.color='#EF4444'" onmouseout="this.style.color='var(--t4)'">삭제</button>
+            </div>
+          `).join('')}
+        </div>
+      `).join('');
+
+  container.innerHTML = `
+    <div style="display:flex;align-items:center;gap:.5rem;background:color-mix(in srgb,#6366F1 8%,var(--bg-inset));border:1px solid #6366F120;border-radius:.625rem;padding:.5rem .75rem;margin-bottom:.875rem">
+      <span style="font-size:.75rem;color:#6366F1">✦</span>
+      <span style="font-size:.75rem;color:var(--t2)">기본 내장 키워드 <b>${builtinCount}개</b> 자동 적용 중</span>
+      <span style="font-size:.6875rem;color:var(--t4);margin-left:auto">내 키워드가 우선</span>
     </div>
-  `).join('');
+    <div style="font-size:.625rem;font-weight:700;color:var(--t3);letter-spacing:.06em;text-transform:uppercase;margin-bottom:.375rem">내 키워드 (${entries.length}개)</div>
+    ${userHtml}
+  `;
+
   const sel = document.getElementById('newCategory');
   if (sel) sel.innerHTML = Object.keys(CATEGORIES).map(c => `<option value="${c}">${c}</option>`).join('');
 }
@@ -706,15 +1069,15 @@ function renderIncome() {
     } else {
       const fixPct = Math.min(Math.round(fixTotal / incTotal * 100), 100);
       const disposable = incTotal - fixTotal;
-      const dColor = disposable >= 0 ? '#10B981' : '#EF4444';
+      const dColor = disposable >= 0 ? 'var(--color-income)' : 'var(--color-expense)';
       vsEl.innerHTML = `
         <div style="margin-bottom:.5rem">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.25rem">
             <span style="font-size:.75rem;font-weight:600;color:var(--t2)">월 수입</span>
-            <span class="num" style="font-size:.75rem;font-weight:700;color:var(--t2)">${fmtAmt(incTotal)}</span>
+            <span class="num" style="font-size:.75rem;font-weight:700;color:var(--color-income)">${fmtAmt(incTotal)}</span>
           </div>
           <div style="background:var(--bg-inset);border-radius:9999px;height:6px">
-            <div style="background:#10B981;height:100%;border-radius:9999px;width:100%"></div>
+            <div style="background:var(--color-income);height:100%;border-radius:9999px;width:100%"></div>
           </div>
         </div>
         ${fixTotal > 0 ? `
@@ -722,12 +1085,12 @@ function renderIncome() {
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.25rem">
             <span style="font-size:.75rem;font-weight:600;color:var(--t2)">고정 지출</span>
             <div style="display:flex;align-items:center;gap:.5rem">
-              <span class="num" style="font-size:.75rem;font-weight:700;color:var(--t2)">${fmtAmt(fixTotal)}</span>
+              <span class="num" style="font-size:.75rem;font-weight:700;color:var(--color-expense)">${fmtAmt(fixTotal)}</span>
               <span class="num" style="font-size:.625rem;color:var(--t4)">${fixPct}%</span>
             </div>
           </div>
           <div style="background:var(--bg-inset);border-radius:9999px;height:6px;overflow:hidden">
-            <div style="background:#EF4444;height:100%;border-radius:9999px;width:${fixPct}%"></div>
+            <div style="background:var(--color-expense);height:100%;border-radius:9999px;width:${fixPct}%"></div>
           </div>
         </div>
         <div style="display:flex;justify-content:space-between;align-items:center;padding:.625rem .875rem;background:var(--bg-inset);border-radius:.75rem">
@@ -745,12 +1108,12 @@ function renderIncome() {
     } else {
       container.innerHTML = incList.map(item => `
         <div class="divider-row" style="display:flex;align-items:center;gap:.625rem">
-          <span style="width:.375rem;height:.375rem;border-radius:50%;background:#10B981;flex-shrink:0"></span>
+          <span style="width:.375rem;height:.375rem;border-radius:50%;background:var(--color-income);flex-shrink:0"></span>
           <div style="flex:1;min-width:0">
             <div style="font-size:.875rem;font-weight:700;color:var(--t1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${item.name}</div>
             ${item.day ? `<div style="font-size:.6875rem;color:var(--t4)">매월 ${item.day}일 입금</div>` : '<div style="font-size:.6875rem;color:var(--t5)">입금일 미설정</div>'}
           </div>
-          <span class="num" style="font-size:.875rem;font-weight:800;color:#10B981;flex-shrink:0">+${fmtAmt(item.amount)}</span>
+          <span class="num" style="font-size:.875rem;font-weight:800;color:var(--color-income);flex-shrink:0">+${fmtAmt(item.amount)}</span>
           <button onclick="removeIncome('${item.id}')"
             style="color:var(--t5);background:none;border:none;cursor:pointer;padding:.25rem;border-radius:.375rem;flex-shrink:0;display:flex;align-items:center;transition:color .15s"
             onmouseover="this.style.color='#EF4444'" onmouseout="this.style.color='var(--t5)'">
@@ -932,6 +1295,155 @@ function renderCalendar(txs) {
   grid.innerHTML = html;
 }
 
+/* ── 멤버 관리 ── */
+function renderMemberPills(allTxs) {
+  const members = getMembers();
+  const row = document.getElementById('memberFilterRow');
+  if (!row) return;
+  if (members.length === 0) { row.classList.add('hidden'); return; }
+  row.classList.remove('hidden');
+
+  const pillsEl = document.getElementById('memberPills');
+  if (!pillsEl) return;
+
+  const active = (allTxs || []).filter(t => !t.isCancelled);
+  const isAll  = state.activeMember === 'all';
+  pillsEl.innerHTML = [
+    `<button class="member-pill${isAll ? ' member-pill-on' : ''}" onclick="switchMember('all')">전체 합산</button>`,
+    ...members.map(m => {
+      const amt  = active.filter(t => t.memberId === m.id).reduce((s,t) => s+t.amount, 0);
+      const isOn = state.activeMember === m.id;
+      return `<button class="member-pill${isOn ? ' member-pill-on' : ''}"
+        style="${isOn ? `background:${m.color};border-color:${m.color}` : ''}"
+        onclick="switchMember('${m.id}')">
+        <span style="width:.4rem;height:.4rem;border-radius:50%;background:${isOn ? 'rgba(255,255,255,.8)' : m.color};display:inline-block;flex-shrink:0"></span>
+        ${m.name}${amt > 0 ? `<span style="opacity:.75;font-weight:500"> ${shortFmt(amt)}</span>` : ''}
+      </button>`;
+    }),
+  ].join('');
+  refreshIcons();
+}
+
+function renderMemberBreakdown(allTxs) {
+  const members = getMembers();
+  const card      = document.getElementById('memberBreakdownCard');
+  const container = document.getElementById('memberBreakdown');
+  if (!card || !container) return;
+  if (members.length === 0) { card.classList.add('hidden'); return; }
+  card.classList.remove('hidden');
+
+  const active     = (allTxs || []).filter(t => !t.isCancelled);
+  const grandTotal = active.reduce((s,t) => s+t.amount, 0);
+
+  if (grandTotal === 0) {
+    container.innerHTML = `<p style="font-size:.75rem;color:var(--t5);text-align:center;padding:.5rem 0">이번 달 내역 없음</p>`;
+    return;
+  }
+
+  container.innerHTML = members.map(m => {
+    const mTxs   = active.filter(t => t.memberId === m.id);
+    const mTotal = mTxs.reduce((s,t) => s+t.amount, 0);
+    const pct    = Math.round(mTotal / grandTotal * 100);
+    return `
+      <div style="margin-bottom:.625rem">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.25rem">
+          <div style="display:flex;align-items:center;gap:.375rem">
+            <span style="width:.4rem;height:.4rem;border-radius:50%;background:${m.color};flex-shrink:0"></span>
+            <span style="font-size:.75rem;font-weight:700;color:var(--t2)">${m.name}</span>
+            <span style="font-size:.625rem;color:var(--t4)">${mTxs.length}건</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:.5rem">
+            <span class="num" style="font-size:.75rem;font-weight:700;color:var(--t2)">${fmtAmt(mTotal)}</span>
+            <span class="num" style="font-size:.625rem;color:var(--t4)">${pct}%</span>
+          </div>
+        </div>
+        <div style="background:var(--bg-inset);border-radius:9999px;height:5px;overflow:hidden">
+          <div style="background:${m.color};height:100%;border-radius:9999px;width:${pct}%"></div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function renderInputMemberSelector() {
+  const members = getMembers();
+  const row  = document.getElementById('inputMemberRow');
+  const pils = document.getElementById('inputMemberPills');
+  if (!row || !pils) return;
+  if (members.length === 0) { row.classList.add('hidden'); state.inputMember = null; return; }
+  row.classList.remove('hidden');
+  if (!state.inputMember || !members.find(m => m.id === state.inputMember)) {
+    state.inputMember = members[0].id;
+  }
+  pils.innerHTML = members.map(m => {
+    const isOn = state.inputMember === m.id;
+    return `<button class="member-pill${isOn ? ' member-pill-on' : ''}"
+      style="${isOn ? `background:${m.color};border-color:${m.color}` : ''}"
+      onclick="selectInputMember('${m.id}')">
+      <span style="width:.4rem;height:.4rem;border-radius:50%;background:${isOn ? 'rgba(255,255,255,.8)' : m.color};display:inline-block;flex-shrink:0"></span>
+      ${m.name}
+    </button>`;
+  }).join('');
+}
+
+function renderMemberModalList() {
+  const members   = getMembers();
+  const container = document.getElementById('memberModalList');
+  if (!container) return;
+  if (members.length === 0) {
+    container.innerHTML = `<p style="font-size:.8125rem;color:var(--t5);text-align:center;padding:.75rem 0">멤버가 없습니다.<br><span style="font-size:.6875rem">아래서 추가해보세요.</span></p>`;
+    return;
+  }
+  container.innerHTML = members.map(m => `
+    <div style="display:flex;align-items:center;gap:.75rem;padding:.625rem 0;border-bottom:1px solid var(--divider)">
+      <span style="width:.75rem;height:.75rem;border-radius:50%;background:${m.color};flex-shrink:0"></span>
+      <span style="flex:1;font-size:.875rem;font-weight:700;color:var(--t1)">${m.name}</span>
+      <button onclick="removeMember('${m.id}')"
+        style="color:var(--t5);background:none;border:none;cursor:pointer;font-size:.8125rem;padding:.2rem .5rem;border-radius:.375rem;transition:color .15s"
+        onmouseover="this.style.color='#EF4444'" onmouseout="this.style.color='var(--t5)'">삭제</button>
+    </div>`).join('');
+}
+
+window.switchMember = (id) => {
+  state.activeMember = id;
+  renderDashboard();
+};
+window.selectInputMember = (id) => {
+  state.inputMember = id;
+  renderInputMemberSelector();
+};
+window.openMemberModal = () => {
+  renderMemberModalList();
+  document.getElementById('memberModal').classList.remove('hidden');
+};
+window.closeMemberModal = () => document.getElementById('memberModal').classList.add('hidden');
+window.addMember = () => {
+  const name = document.getElementById('newMemberName').value.trim();
+  if (!name) { showToast('이름을 입력해주세요.'); return; }
+  const members = getMembers();
+  if (members.find(m => m.name === name)) { showToast('이미 같은 이름의 멤버가 있습니다.'); return; }
+  const color = MEMBER_COLORS[members.length % MEMBER_COLORS.length];
+  members.push({ id: genId(), name, color });
+  saveMembers(members);
+  document.getElementById('newMemberName').value = '';
+  renderMemberModalList();
+  showToast(`${name} 추가됨 ✓`);
+};
+window.removeMember = (id) => {
+  const m = getMembers().find(i => i.id === id);
+  showConfirm(
+    `${m?.name || '멤버'} 삭제`,
+    '멤버를 삭제해도 해당 내역은 유지되며 "전체 합산"에서 확인할 수 있습니다.',
+    () => {
+      saveMembers(getMembers().filter(i => i.id !== id));
+      if (state.activeMember === id) state.activeMember = 'all';
+      if (state.inputMember  === id) state.inputMember  = null;
+      renderMemberModalList();
+      if (state.tab === 'dashboard') renderDashboard();
+    },
+    '삭제', '#EF4444'
+  );
+};
+
 /* ── 초기화 ── */
 document.addEventListener('DOMContentLoaded', () => {
   if (!localStorage.getItem(SK.KW)) saveKwMap(DEFAULT_KEYWORD_MAP);
@@ -988,7 +1500,10 @@ window.parseStatement = () => {
 window.saveTransactions = () => {
   if (state.pending.length === 0) return;
   const all = JSON.parse(localStorage.getItem(SK.TX) || '{}');
-  all[state.ym] = [...(all[state.ym] || []), ...state.pending];
+  const txsToSave = state.inputMember
+    ? state.pending.map(tx => ({ ...tx, memberId: state.inputMember }))
+    : state.pending;
+  all[state.ym] = [...(all[state.ym] || []), ...txsToSave];
   localStorage.setItem(SK.TX, JSON.stringify(all));
   showToast(`${state.pending.length}건 저장 완료 ✓`);
   state.pending = [];
@@ -1033,6 +1548,12 @@ window.confirmResetKeywords = () => {
     renderKeywords();
   });
 };
+window.openKeywordsModal = () => {
+  renderKeywords();
+  document.getElementById('keywordsModal').classList.remove('hidden');
+  refreshIcons();
+};
+window.closeKeywordsModal = () => document.getElementById('keywordsModal').classList.add('hidden');
 window.closeConfirm = closeConfirm;
 window.confirmClearMonth = () => {
   showConfirm(
@@ -1063,6 +1584,14 @@ window.openSampleModal = () => {
       </div>
     `).join('');
   }
+  const demoBtn = document.getElementById('sampleDemoBtn');
+  if (demoBtn) {
+    const isLoaded = hasDemoData();
+    demoBtn.textContent = isLoaded ? '샘플 데이터 제거' : '샘플 데이터 바로 저장';
+    demoBtn.onclick = isLoaded
+      ? () => { removeDemoData(); closeSampleModal(); }
+      : () => { loadDemoData(); closeSampleModal(); };
+  }
   document.getElementById('sampleModal').classList.remove('hidden');
 };
 window.closeSampleModal = () => document.getElementById('sampleModal').classList.add('hidden');
@@ -1077,19 +1606,37 @@ window.loadSampleToInput = () => {
   document.getElementById('statementInput').value = SAMPLE_RAW_TEXT;
   window.closeSampleModal();
 };
+function hasDemoData() {
+  const all = JSON.parse(localStorage.getItem(SK.TX) || '{}');
+  return Object.values(all).some(txs => txs.some(t => t._isDemo));
+}
+
+window.removeDemoData = () => {
+  const all = JSON.parse(localStorage.getItem(SK.TX) || '{}');
+  let changed = false;
+  Object.keys(all).forEach(ym => {
+    const filtered = all[ym].filter(t => !t._isDemo);
+    if (filtered.length !== all[ym].length) { all[ym] = filtered; changed = true; }
+  });
+  if (changed) {
+    localStorage.setItem(SK.TX, JSON.stringify(all));
+    renderDashboard();
+  }
+};
+
 window.loadDemoData = () => {
   const ym = state.ym;
   const demo = [
-    { id:genId(), merchant:'스타벅스',   amount:5500,  category:'식비',      date:`${ym}-05`, isInstallment:false, isCancelled:false },
-    { id:genId(), merchant:'배달의민족',  amount:24000, category:'식비',      date:`${ym}-08`, isInstallment:false, isCancelled:false },
-    { id:genId(), merchant:'카카오 택시', amount:8900,  category:'교통',      date:`${ym}-10`, isInstallment:false, isCancelled:false },
-    { id:genId(), merchant:'쿠팡',        amount:35000, category:'쇼핑/생활', date:`${ym}-12`, isInstallment:false, isCancelled:false },
-    { id:genId(), merchant:'LGU+ 통신',   amount:55000, category:'고정지출',  date:`${ym}-15`, isInstallment:false, isCancelled:false },
-    { id:genId(), merchant:'올리브영',    amount:22000, category:'쇼핑/생활', date:`${ym}-18`, isInstallment:false, isCancelled:false },
-    { id:genId(), merchant:'컴포즈커피',  amount:3500,  category:'식비',      date:`${ym}-20`, isInstallment:false, isCancelled:false },
+    { id:genId(), merchant:'스타벅스',   amount:5500,  category:'식비',      date:`${ym}-05`, isInstallment:false, isCancelled:false, _isDemo:true },
+    { id:genId(), merchant:'배달의민족',  amount:24000, category:'식비',      date:`${ym}-08`, isInstallment:false, isCancelled:false, _isDemo:true },
+    { id:genId(), merchant:'카카오 택시', amount:8900,  category:'교통',      date:`${ym}-10`, isInstallment:false, isCancelled:false, _isDemo:true },
+    { id:genId(), merchant:'쿠팡',        amount:35000, category:'쇼핑/생활', date:`${ym}-12`, isInstallment:false, isCancelled:false, _isDemo:true },
+    { id:genId(), merchant:'LGU+ 통신',   amount:55000, category:'고정지출',  date:`${ym}-15`, isInstallment:false, isCancelled:false, _isDemo:true },
+    { id:genId(), merchant:'올리브영',    amount:22000, category:'쇼핑/생활', date:`${ym}-18`, isInstallment:false, isCancelled:false, _isDemo:true },
+    { id:genId(), merchant:'컴포즈커피',  amount:3500,  category:'식비',      date:`${ym}-20`, isInstallment:false, isCancelled:false, _isDemo:true },
   ];
   const all = JSON.parse(localStorage.getItem(SK.TX) || '{}');
-  all[ym] = demo;
+  all[ym] = [...(all[ym] || []).filter(t => !t._isDemo), ...demo];
   localStorage.setItem(SK.TX, JSON.stringify(all));
   renderDashboard();
 };
