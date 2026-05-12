@@ -7,6 +7,7 @@ const CATEGORIES = {
   '교통':         { color:'#3B82F6', bg:'#EFF6FF', darkBg:'#0c1e3b', icon:'car'           },
   '쇼핑/생활':    { color:'#10B981', bg:'#ECFDF5', darkBg:'#062a1a', icon:'shopping-bag'  },
   '고정지출':     { color:'#8B5CF6', bg:'#F5F3FF', darkBg:'#1e1040', icon:'repeat'        },
+  '경조사':       { color:'#EC4899', bg:'#FDF2F8', darkBg:'#2d0a1f', icon:'gift'          },
   '기타':         { color:'#94A3B8', bg:'#F8FAFC', darkBg:'#141b2d', icon:'help-circle'   },
 };
 
@@ -20,7 +21,7 @@ const CAT_GROUPS_FOR_TABS = {
   '기타':      ['기타'],
 };
 
-const SK = { TX: 'vml_transactions', KW: 'vml_keyword_map', DARK: 'vml_dark', LAYOUT: 'vml_layout', FIXED: 'vml_fixed', INCOME: 'vml_income', MEMBERS: 'vml_members' };
+const SK = { TX: 'vml_transactions', KW: 'vml_keyword_map', DARK: 'vml_dark', LAYOUT: 'vml_layout', FIXED: 'vml_fixed', INCOME: 'vml_income', MEMBERS: 'vml_members', PLAN: 'vml_planned' };
 
 const MEMBER_COLORS = ['#6366F1','#EC4899','#10B981','#F59E0B','#14B8A6','#8B5CF6','#EF4444','#F97316'];
 
@@ -53,6 +54,8 @@ const getFixed   = () => JSON.parse(localStorage.getItem(SK.FIXED)  || '[]');
 const saveFixed  = arr => localStorage.setItem(SK.FIXED, JSON.stringify(arr));
 const getIncome   = () => JSON.parse(localStorage.getItem(SK.INCOME)   || '[]');
 const saveIncome  = arr => localStorage.setItem(SK.INCOME, JSON.stringify(arr));
+const getPlanned  = () => JSON.parse(localStorage.getItem(SK.PLAN)    || '[]');
+const savePlanned = arr => localStorage.setItem(SK.PLAN,   JSON.stringify(arr));
 const getMembers  = () => JSON.parse(localStorage.getItem(SK.MEMBERS)  || '[]');
 const saveMembers = arr => localStorage.setItem(SK.MEMBERS, JSON.stringify(arr));
 const saveMth   = (ym, data) => {
@@ -673,6 +676,7 @@ function switchTab(tab) {
   if (tab === 'dashboard') renderDashboard();
   if (tab === 'fixed')     renderFixed();
   if (tab === 'income')    renderIncome();
+  if (tab === 'plan')      renderPlanned();
   if (tab === 'input')     renderInputMemberSelector();
   refreshIcons();
 }
@@ -1245,6 +1249,183 @@ window.saveIncomeEdit = (id) => {
   const day = dayRaw ? parseInt(dayRaw) : null;
   saveIncome(getIncome().map(i => i.id === id ? { ...i, name, amount, day } : i));
   renderIncome();
+  showToast(`${name} 수정됨 ✓`);
+};
+
+/* ── 예정 지출 ── */
+function renderPlanned() {
+  const items = getPlanned();
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const dday = (dateStr) => {
+    const d = new Date(dateStr);
+    d.setHours(0, 0, 0, 0);
+    return Math.round((d - today) / 86400000);
+  };
+
+  // 현재 월 남은 예정 금액 (오늘 포함 미래)
+  const [curY, curM] = state.ym.split('-').map(Number);
+  const upcoming = items.filter(item => {
+    const d = new Date(item.date);
+    return d.getFullYear() === curY && d.getMonth() + 1 === curM && dday(item.date) >= 0;
+  });
+  const upcomingTotal = upcoming.reduce((s, i) => s + i.amount, 0);
+
+  const heroAmtEl = document.getElementById('planHeroAmt');
+  if (heroAmtEl) heroAmtEl.textContent = fmtAmt(upcomingTotal);
+  const heroSubEl = document.getElementById('planHeroSub');
+  if (heroSubEl) {
+    const cnt = upcoming.length;
+    const todayCnt = upcoming.filter(i => dday(i.date) === 0).length;
+    heroSubEl.textContent = cnt === 0
+      ? '이번 달 남은 예정 지출 없음'
+      : `이번 달 ${cnt}건${todayCnt > 0 ? ` · 오늘 ${todayCnt}건 예정` : ''}`;
+  }
+
+  // 정렬: 미래(가까운 순) → 오늘 → 과거(최근 순)
+  const future = items.filter(i => dday(i.date) > 0).sort((a, b) => new Date(a.date) - new Date(b.date));
+  const todayItems = items.filter(i => dday(i.date) === 0);
+  const past   = items.filter(i => dday(i.date) < 0).sort((a, b) => new Date(b.date) - new Date(a.date));
+  const sorted = [...future, ...todayItems, ...past];
+
+  const countEl = document.getElementById('planCount');
+  if (countEl) countEl.textContent = `${items.length}건`;
+
+  // 카테고리 셀렉트 초기화 (빈 경우에만)
+  const sel = document.getElementById('planCategory');
+  if (sel && !sel.innerHTML) {
+    sel.innerHTML = Object.keys(CATEGORIES).map(c =>
+      `<option value="${c}"${c === '경조사' ? ' selected' : ''}>${c}</option>`
+    ).join('');
+  }
+
+  const container = document.getElementById('planList');
+  if (!container) return;
+
+  if (sorted.length === 0) {
+    container.innerHTML = `<p style="font-size:.8125rem;color:var(--t5);text-align:center;padding:.75rem 0">아직 등록된 예정 지출이 없습니다</p>`;
+    refreshIcons();
+    return;
+  }
+
+  container.innerHTML = sorted.map(item => {
+    const diff   = dday(item.date);
+    const isPast = diff < 0;
+    const isToday = diff === 0;
+    const catInfo = CATEGORIES[item.category] || { color: '#94A3B8' };
+
+    let ddayText, ddayBg, ddayFg;
+    if (isToday) {
+      ddayText = 'D-Day'; ddayBg = '#EF4444'; ddayFg = '#fff';
+    } else if (isPast) {
+      ddayText = `D+${Math.abs(diff)}`; ddayBg = 'var(--bg-raised)'; ddayFg = 'var(--t5)';
+    } else if (diff <= 7) {
+      ddayText = `D-${diff}`; ddayBg = '#FEF2F2'; ddayFg = '#EF4444';
+    } else {
+      ddayText = `D-${diff}`; ddayBg = 'var(--bg-inset)'; ddayFg = 'var(--t3)';
+    }
+
+    return `
+    <div id="planRow-${item.id}" class="divider-row" style="display:flex;align-items:center;gap:.625rem${isPast ? ';opacity:.45' : ''}">
+      <span style="font-size:.625rem;font-weight:700;padding:.25rem .5rem;border-radius:9999px;background:${ddayBg};color:${ddayFg};white-space:nowrap;flex-shrink:0;min-width:2.75rem;text-align:center">${ddayText}</span>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:.875rem;font-weight:700;color:var(--t1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${item.name}</div>
+        <div style="display:flex;align-items:center;gap:.375rem;margin-top:.125rem">
+          <span style="font-size:.6875rem;font-weight:600;color:${catInfo.color}">${item.category}</span>
+          <span style="font-size:.6875rem;color:var(--t5)">${item.date}</span>
+        </div>
+      </div>
+      <span class="num" style="font-size:.875rem;font-weight:800;color:var(--color-expense);flex-shrink:0">${fmtAmt(item.amount)}</span>
+      <button onclick="editPlanned('${item.id}')" title="수정"
+        style="color:var(--t5);background:none;border:none;cursor:pointer;padding:.25rem;border-radius:.375rem;flex-shrink:0;display:flex;align-items:center;transition:color .15s"
+        onmouseover="this.style.color='var(--t1)'" onmouseout="this.style.color='var(--t5)'">
+        <i data-lucide="pencil" style="width:13px;height:13px"></i>
+      </button>
+      <button onclick="removePlanned('${item.id}')" title="삭제"
+        style="color:var(--t5);background:none;border:none;cursor:pointer;padding:.25rem;border-radius:.375rem;flex-shrink:0;display:flex;align-items:center;transition:color .15s"
+        onmouseover="this.style.color='#EF4444'" onmouseout="this.style.color='var(--t5)'">
+        <i data-lucide="trash-2" style="width:13px;height:13px"></i>
+      </button>
+    </div>`;
+  }).join('');
+
+  refreshIcons();
+}
+
+window.addPlanned = () => {
+  const name   = document.getElementById('planName').value.trim();
+  const amtRaw = document.getElementById('planAmount').value.trim();
+  const date   = document.getElementById('planDate').value;
+  const cat    = document.getElementById('planCategory').value;
+  if (!name) { showToast('항목명을 입력해주세요.'); return; }
+  if (!date) { showToast('날짜를 선택해주세요.'); return; }
+  const amount = parseInt(amtRaw.replace(/[^0-9]/g, ''));
+  if (!amount || amount <= 0) { showToast('금액을 올바르게 입력해주세요.'); return; }
+  const list = getPlanned();
+  list.push({ id: genId(), name, amount, date, category: cat });
+  savePlanned(list);
+  document.getElementById('planName').value   = '';
+  document.getElementById('planAmount').value = '';
+  document.getElementById('planDate').value   = '';
+  renderPlanned();
+  showToast(`${name} 추가됨 ✓`);
+};
+
+window.removePlanned = (id) => {
+  const item = getPlanned().find(i => i.id === id);
+  showConfirm(
+    `${item?.name || '항목'} 삭제`,
+    '이 예정 지출 항목을 삭제하시겠습니까?',
+    () => { savePlanned(getPlanned().filter(i => i.id !== id)); renderPlanned(); },
+    '삭제', '#EF4444'
+  );
+};
+
+window.editPlanned = (id) => {
+  const item = getPlanned().find(i => i.id === id);
+  if (!item) return;
+  const row = document.getElementById(`planRow-${id}`);
+  if (!row) return;
+  row.style.alignItems = 'flex-start';
+  row.style.paddingTop = '.5rem';
+  row.style.paddingBottom = '.5rem';
+  row.style.opacity = '1';
+  const catOpts = Object.keys(CATEGORIES).map(c =>
+    `<option value="${c}"${c === item.category ? ' selected' : ''}>${c}</option>`
+  ).join('');
+  row.innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:.5rem;width:100%">
+      <div style="display:flex;gap:.5rem">
+        <input id="ppN-${id}" class="app-input" value="${item.name.replace(/"/g,'&quot;')}"
+          style="flex:1;padding:.45rem .625rem;font-size:.8125rem" placeholder="항목명">
+        <input id="ppA-${id}" class="app-input" value="${item.amount}"
+          style="width:7rem;padding:.45rem .625rem;font-size:.8125rem;text-align:right" placeholder="금액">
+      </div>
+      <div style="display:flex;gap:.375rem;align-items:center;flex-wrap:wrap">
+        <input id="ppD-${id}" class="app-input" type="date" value="${item.date}"
+          style="flex:1;min-width:120px;padding:.45rem .625rem;font-size:.8125rem">
+        <select id="ppC-${id}" class="app-input" style="flex:1;min-width:80px;padding:.45rem .625rem;font-size:.8125rem">${catOpts}</select>
+        <button onclick="savePlannedEdit('${id}')" class="btn-sm">저장</button>
+        <button onclick="renderPlanned()"
+          style="font-size:.75rem;font-weight:600;color:var(--t3);background:none;border:none;cursor:pointer;padding:.45rem .5rem;border-radius:.625rem;transition:background .15s"
+          onmouseover="this.style.background='var(--bg-raised)'" onmouseout="this.style.background='none'">취소</button>
+      </div>
+    </div>`;
+  document.getElementById(`ppN-${id}`)?.focus();
+};
+
+window.savePlannedEdit = (id) => {
+  const name   = document.getElementById(`ppN-${id}`)?.value.trim();
+  const amtRaw = document.getElementById(`ppA-${id}`)?.value.trim();
+  const date   = document.getElementById(`ppD-${id}`)?.value;
+  const cat    = document.getElementById(`ppC-${id}`)?.value;
+  if (!name) { showToast('항목명을 입력해주세요.'); return; }
+  if (!date) { showToast('날짜를 선택해주세요.'); return; }
+  const amount = parseInt(amtRaw.replace(/[^0-9]/g, ''));
+  if (!amount || amount <= 0) { showToast('금액을 올바르게 입력해주세요.'); return; }
+  savePlanned(getPlanned().map(i => i.id === id ? { ...i, name, amount, date, category: cat } : i));
+  renderPlanned();
   showToast(`${name} 수정됨 ✓`);
 };
 

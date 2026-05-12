@@ -75,6 +75,7 @@
       <button class="tab-btn" data-tab="input"     onclick="switchTab('input')">내역 입력</button>
       <button class="tab-btn" data-tab="fixed"     onclick="switchTab('fixed')">고정지출</button>
       <button class="tab-btn" data-tab="income"    onclick="switchTab('income')">수입 설정</button>
+      <button class="tab-btn" data-tab="plan"      onclick="switchTab('plan')">예정 지출</button>
     </nav>
   </header>
 
@@ -348,6 +349,51 @@
     </div>
     <div style="height:2rem"></div>
   </div><!-- /tab-income -->
+
+
+  <!-- ══════════════════════════════════════════
+    탭 6: 예정 지출
+  ══════════════════════════════════════════ -->
+  <div id="tab-plan" class="tab-content hidden">
+    <div style="display:flex;flex-direction:column;gap:.75rem">
+
+      <!-- 히어로: 이번 달 남은 예정 지출 합계 -->
+      <div class="card">
+        <p style="font-size:.6875rem;font-weight:600;color:var(--t4);letter-spacing:.04em;text-transform:uppercase;margin-bottom:.375rem">이번 달 남은 예정 지출</p>
+        <p id="planHeroAmt" class="num" style="font-size:2.25rem;font-weight:800;color:var(--color-expense);line-height:1;letter-spacing:-.03em;margin-bottom:.5rem">0원</p>
+        <p id="planHeroSub" style="font-size:.75rem;color:var(--t4)">예정 항목 없음</p>
+      </div>
+
+      <!-- 예정 지출 항목 목록 + 추가 폼 -->
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.625rem">
+          <h2 style="font-size:.8125rem;font-weight:700;color:var(--t2)">예정 지출 항목</h2>
+          <span id="planCount" style="font-size:.6875rem;color:var(--t4)">0건</span>
+        </div>
+
+        <!-- 안내 텍스트 -->
+        <p style="font-size:.6875rem;color:var(--t5);margin-bottom:.625rem">경조사·세금·보험료 등 특정 날짜에 나갈 돈을 미리 등록하면 D-day로 확인할 수 있습니다.</p>
+
+        <div id="planList" style="margin-bottom:.625rem"></div>
+        <div class="or-divider" style="margin:.5rem 0">항목 추가</div>
+        <div style="display:flex;flex-direction:column;gap:.5rem">
+          <div style="display:flex;gap:.5rem">
+            <input id="planName" type="text" placeholder="항목명 (예: 친구 결혼식 축의금)" class="app-input" style="flex:1;min-width:0"
+              onkeydown="if(event.key==='Enter')addPlanned()">
+            <input id="planAmount" type="number" placeholder="금액" class="app-input" style="width:108px;flex-shrink:0"
+              onkeydown="if(event.key==='Enter')addPlanned()">
+          </div>
+          <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+            <input id="planDate" type="date" class="app-input" style="flex:1;min-width:130px">
+            <select id="planCategory" class="app-input" style="flex:1;min-width:88px"></select>
+            <button onclick="addPlanned()" class="btn-sm" style="flex-shrink:0">추가하기</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+    <div style="height:2rem"></div>
+  </div><!-- /tab-plan -->
 
 </div><!-- /app -->
 
