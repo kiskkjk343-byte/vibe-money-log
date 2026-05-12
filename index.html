@@ -384,7 +384,11 @@
               onkeydown="if(event.key==='Enter')addPlanned()">
           </div>
           <div style="display:flex;gap:.5rem;flex-wrap:wrap">
-            <input id="planDate" type="date" class="app-input" style="flex:1;min-width:130px">
+            <input id="planDate" type="hidden">
+            <button type="button" onclick="openDatePicker('planDate','planDateLabel')" class="app-input" style="flex:1;min-width:130px;display:flex;align-items:center;gap:.375rem;cursor:pointer">
+              <i data-lucide="calendar" style="width:13px;height:13px;color:var(--t4);flex-shrink:0"></i>
+              <span id="planDateLabel" style="color:var(--t4)">날짜 선택</span>
+            </button>
             <select id="planCategory" class="app-input" style="flex:1;min-width:88px"></select>
             <button onclick="addPlanned()" class="btn-sm" style="flex-shrink:0">추가하기</button>
           </div>
@@ -543,6 +547,55 @@
     <div style="display:flex;gap:.5rem">
       <button onclick="closeConfirm()" style="flex:1;padding:.625rem;font-size:.8125rem;font-weight:500;color:var(--t3);border:1px solid var(--border);background:var(--bg-card);border-radius:.75rem;cursor:pointer;transition:background .15s">취소</button>
       <button id="confirmOkBtn"        style="flex:1;padding:.625rem;font-size:.8125rem;font-weight:700;color:#fff;background:#EF4444;border:none;border-radius:.75rem;cursor:pointer;transition:background .15s">삭제</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+  날짜 선택 캘린더 모달
+══════════════════════════════════════════ -->
+<div id="datePickerModal" class="hidden" style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:60;display:flex;align-items:center;justify-content:center;padding:1rem"
+  onclick="if(event.target===this)closeDatePicker()">
+  <div style="background:var(--bg-card);border-radius:1rem;width:100%;max-width:316px;box-shadow:0 24px 64px rgba(0,0,0,.35);animation:slideUp .22s cubic-bezier(.16,1,.3,1);overflow:hidden">
+
+    <!-- 헤더: 연/월 네비게이션 -->
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:.875rem 1rem .625rem;border-bottom:1px solid var(--border)">
+      <div style="display:flex;gap:.125rem">
+        <button onclick="datePickerNav('year',-1)" class="btn-icon" style="padding:.35rem" title="이전 년도">
+          <i data-lucide="chevrons-left" style="width:14px;height:14px"></i>
+        </button>
+        <button onclick="datePickerNav('month',-1)" class="btn-icon" style="padding:.35rem" title="이전 달">
+          <i data-lucide="chevron-left" style="width:14px;height:14px"></i>
+        </button>
+      </div>
+      <span id="datePickerLabel" style="font-size:.9375rem;font-weight:800;color:var(--t1)"></span>
+      <div style="display:flex;gap:.125rem">
+        <button onclick="datePickerNav('month',1)" class="btn-icon" style="padding:.35rem" title="다음 달">
+          <i data-lucide="chevron-right" style="width:14px;height:14px"></i>
+        </button>
+        <button onclick="datePickerNav('year',1)" class="btn-icon" style="padding:.35rem" title="다음 년도">
+          <i data-lucide="chevrons-right" style="width:14px;height:14px"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- 요일 헤더 -->
+    <div style="display:grid;grid-template-columns:repeat(7,1fr);padding:.625rem .875rem .25rem">
+      <div style="text-align:center;font-size:.625rem;font-weight:700;color:#EF4444;padding:.25rem 0">일</div>
+      <div style="text-align:center;font-size:.625rem;font-weight:700;color:var(--t4);padding:.25rem 0">월</div>
+      <div style="text-align:center;font-size:.625rem;font-weight:700;color:var(--t4);padding:.25rem 0">화</div>
+      <div style="text-align:center;font-size:.625rem;font-weight:700;color:var(--t4);padding:.25rem 0">수</div>
+      <div style="text-align:center;font-size:.625rem;font-weight:700;color:var(--t4);padding:.25rem 0">목</div>
+      <div style="text-align:center;font-size:.625rem;font-weight:700;color:var(--t4);padding:.25rem 0">금</div>
+      <div style="text-align:center;font-size:.625rem;font-weight:700;color:#3B82F6;padding:.25rem 0">토</div>
+    </div>
+
+    <!-- 날짜 그리드 -->
+    <div id="datePickerGrid" style="display:grid;grid-template-columns:repeat(7,1fr);padding:.125rem .875rem .875rem;gap:.2rem"></div>
+
+    <!-- 취소 -->
+    <div style="padding:0 1rem .875rem">
+      <button onclick="closeDatePicker()" style="width:100%;padding:.5rem;font-size:.8125rem;color:var(--t4);background:none;border:1px solid var(--border);border-radius:.75rem;cursor:pointer;transition:background .15s" onmouseover="this.style.background='var(--bg-inset)'" onmouseout="this.style.background='none'">취소</button>
     </div>
   </div>
 </div>

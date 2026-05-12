@@ -39,7 +39,8 @@ const state = {
 };
 
 /* ── 유틸리티 ── */
-const fmtAmt = n => n.toLocaleString('ko-KR') + '원';
+const fmtAmt    = n => n.toLocaleString('ko-KR') + '원';
+const fmtDateKR = s => { if (!s) return '날짜 선택'; const [y,m,d] = s.split('-'); return `${y}년 ${parseInt(m)}월 ${parseInt(d)}일`; };
 const pad    = s => String(s).padStart(2, '0');
 const genId  = () => Math.random().toString(36).slice(2, 9) + Date.now().toString(36);
 const fmtYM  = (ym) => { const [y, m] = ym.split('-'); return `${y}년 ${parseInt(m)}월`; };
@@ -1353,6 +1354,80 @@ function renderPlanned() {
   refreshIcons();
 }
 
+/* ── 날짜 피커 ── */
+const dpState = { inputId: null, displayId: null, year: 0, month: 0, selected: null };
+
+window.openDatePicker = (inputId, displayId) => {
+  const today = new Date();
+  const hidden = document.getElementById(inputId);
+  if (hidden && hidden.value) {
+    const d = new Date(hidden.value);
+    dpState.year = d.getFullYear(); dpState.month = d.getMonth() + 1;
+    dpState.selected = hidden.value;
+  } else {
+    dpState.year = today.getFullYear(); dpState.month = today.getMonth() + 1;
+    dpState.selected = null;
+  }
+  dpState.inputId = inputId; dpState.displayId = displayId;
+  renderDatePickerGrid();
+  document.getElementById('datePickerModal').classList.remove('hidden');
+  refreshIcons();
+};
+
+window.closeDatePicker = () => document.getElementById('datePickerModal').classList.add('hidden');
+
+function renderDatePickerGrid() {
+  const { year, month, selected } = dpState;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const todayStr = `${today.getFullYear()}-${pad(today.getMonth()+1)}-${pad(today.getDate())}`;
+
+  document.getElementById('datePickerLabel').textContent = `${year}년 ${month}월`;
+
+  const firstDay    = new Date(year, month - 1, 1).getDay();
+  const daysInMonth = new Date(year, month, 0).getDate();
+
+  let html = '';
+  for (let i = 0; i < firstDay; i++) html += `<div></div>`;
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr  = `${year}-${pad(month)}-${pad(d)}`;
+    const isSel    = dateStr === selected;
+    const isToday  = dateStr === todayStr;
+    const col      = (firstDay + d - 1) % 7;
+    const isSun    = col === 0, isSat = col === 6;
+
+    let fg = isSun ? '#EF4444' : isSat ? '#3B82F6' : 'var(--t1)';
+    let bg = 'transparent', border = 'none', fw = '500';
+    if (isSel)        { bg = 'var(--btn-bg)'; fg = 'var(--btn-fg)'; fw = '700'; }
+    else if (isToday) { border = '1.5px solid var(--btn-bg)'; fg = 'var(--btn-bg)'; fw = '700'; }
+
+    const hover = isSel ? '' : `onmouseover="this.style.background='var(--bg-inset)'" onmouseout="this.style.background='transparent'"`;
+    html += `<div onclick="selectDatePickerDay('${dateStr}')" ${hover}
+      style="aspect-ratio:1;display:flex;align-items:center;justify-content:center;border-radius:50%;cursor:pointer;font-size:.75rem;font-weight:${fw};color:${fg};background:${bg};border:${border};transition:background .12s">${d}</div>`;
+  }
+  document.getElementById('datePickerGrid').innerHTML = html;
+}
+
+window.datePickerNav = (unit, dir) => {
+  if (unit === 'year') { dpState.year += dir; }
+  else {
+    dpState.month += dir;
+    if (dpState.month > 12) { dpState.year++;  dpState.month = 1; }
+    if (dpState.month < 1)  { dpState.year--;  dpState.month = 12; }
+  }
+  renderDatePickerGrid();
+};
+
+window.selectDatePickerDay = (dateStr) => {
+  dpState.selected = dateStr;
+  const hidden = document.getElementById(dpState.inputId);
+  if (hidden) hidden.value = dateStr;
+  const display = document.getElementById(dpState.displayId);
+  if (display) { display.textContent = fmtDateKR(dateStr); display.style.color = 'var(--t1)'; }
+  window.closeDatePicker();
+};
+
 window.addPlanned = () => {
   const name   = document.getElementById('planName').value.trim();
   const amtRaw = document.getElementById('planAmount').value.trim();
@@ -1368,6 +1443,8 @@ window.addPlanned = () => {
   document.getElementById('planName').value   = '';
   document.getElementById('planAmount').value = '';
   document.getElementById('planDate').value   = '';
+  const lbl = document.getElementById('planDateLabel');
+  if (lbl) { lbl.textContent = '날짜 선택'; lbl.style.color = 'var(--t4)'; }
   renderPlanned();
   showToast(`${name} 추가됨 ✓`);
 };
@@ -1403,8 +1480,12 @@ window.editPlanned = (id) => {
           style="width:7rem;padding:.45rem .625rem;font-size:.8125rem;text-align:right" placeholder="금액">
       </div>
       <div style="display:flex;gap:.375rem;align-items:center;flex-wrap:wrap">
-        <input id="ppD-${id}" class="app-input" type="date" value="${item.date}"
-          style="flex:1;min-width:120px;padding:.45rem .625rem;font-size:.8125rem">
+        <input id="ppD-${id}" type="hidden" value="${item.date}">
+        <button type="button" onclick="openDatePicker('ppD-${id}','ppDLabel-${id}')" class="app-input"
+          style="flex:1;min-width:120px;display:flex;align-items:center;gap:.375rem;cursor:pointer;padding:.45rem .625rem">
+          <i data-lucide="calendar" style="width:13px;height:13px;color:var(--t4);flex-shrink:0"></i>
+          <span id="ppDLabel-${id}" style="color:var(--t1);font-size:.8125rem">${fmtDateKR(item.date)}</span>
+        </button>
         <select id="ppC-${id}" class="app-input" style="flex:1;min-width:80px;padding:.45rem .625rem;font-size:.8125rem">${catOpts}</select>
         <button onclick="savePlannedEdit('${id}')" class="btn-sm">저장</button>
         <button onclick="renderPlanned()"
