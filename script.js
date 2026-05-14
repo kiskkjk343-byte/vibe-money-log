@@ -25,6 +25,25 @@ const SK = { TX: 'vml_transactions', KW: 'vml_keyword_map', DARK: 'vml_dark', LA
 
 const MEMBER_COLORS = ['#6366F1','#EC4899','#10B981','#F59E0B','#14B8A6','#8B5CF6','#EF4444','#F97316'];
 
+/* ── 동기화 설정 ── */
+const SK_SYNC        = 'vml_sync';
+const SYNC_DATA_KEYS = [SK.TX, SK.KW, SK.FIXED, SK.INCOME, SK.MEMBERS, SK.PLAN];
+const getSyncConfig  = () => JSON.parse(localStorage.getItem(SK_SYNC) || 'null');
+const saveSyncConfig = cfg => cfg
+  ? localStorage.setItem(SK_SYNC, JSON.stringify(cfg))
+  : localStorage.removeItem(SK_SYNC);
+const sync = { pushTimer: null, pollTimer: null, lastPushTime: 0, applying: false };
+
+// 동기화 대상 키 변경 시 자동 push (localStorage 인터셉터)
+;(function() {
+  const KEY_SET = new Set(SYNC_DATA_KEYS);
+  const _orig = Storage.prototype.setItem;
+  Storage.prototype.setItem = function(key, value) {
+    _orig.call(this, key, value);
+    if (this === window.localStorage && KEY_SET.has(key) && !sync.applying) triggerPush();
+  };
+}());
+
 const state = {
   ym: `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`,
   tab: 'dashboard',
@@ -1799,6 +1818,189 @@ window.removeMember = (id) => {
   );
 };
 
+/* ── 클라우드 동기화 ── */
+function getAllSyncData() {
+  const d = {};
+  SYNC_DATA_KEYS.forEach(k => { d[k] = localStorage.getItem(k) || (k === SK.TX || k === SK.KW ? '{}' : '[]'); });
+  return d;
+}
+
+function applyRemoteData(data) {
+  sync.applying = true;
+  SYNC_DATA_KEYS.forEach(k => { if (data[k] !== undefined) localStorage.setItem(k, data[k]); });
+  sync.applying = false;
+  switchTab(state.tab);
+}
+
+async function fbGet(dbUrl, code) {
+  try {
+    const r = await fetch(`${dbUrl.replace(/\/$/, '')}/rooms/${code}.json`);
+    if (!r.ok) return null;
+    const d = await r.json();
+    return (d && typeof d === 'object') ? d : null;
+  } catch { return null; }
+}
+
+async function fbSet(dbUrl, code, data) {
+  try {
+    const r = await fetch(`${dbUrl.replace(/\/$/, '')}/rooms/${code}.json`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    return r.ok;
+  } catch { return false; }
+}
+
+function triggerPush() {
+  const cfg = getSyncConfig();
+  if (!cfg?.dbUrl || !cfg?.code) return;
+  clearTimeout(sync.pushTimer);
+  sync.pushTimer = setTimeout(async () => {
+    sync.lastPushTime = Date.now();
+    await fbSet(cfg.dbUrl, cfg.code, getAllSyncData());
+  }, 800);
+}
+
+function startSyncPoll() {
+  stopSyncPoll();
+  const cfg = getSyncConfig();
+  if (!cfg?.dbUrl || !cfg?.code) return;
+  sync.pollTimer = setInterval(async () => {
+    const c = getSyncConfig();
+    if (!c?.code) return;
+    if (Date.now() - sync.lastPushTime < 4000) return;
+    const remote = await fbGet(c.dbUrl, c.code);
+    if (!remote) return;
+    const local = getAllSyncData();
+    const changed = SYNC_DATA_KEYS.some(k => remote[k] !== local[k]);
+    if (changed) applyRemoteData(remote);
+  }, 5000);
+}
+
+function stopSyncPoll() {
+  if (sync.pollTimer) { clearInterval(sync.pollTimer); sync.pollTimer = null; }
+}
+
+function updateSyncIndicator() {
+  const cfg = getSyncConfig();
+  const icon  = document.getElementById('syncIcon');
+  const label = document.getElementById('syncLabel');
+  const btn   = document.getElementById('syncBtn');
+  if (cfg?.code) {
+    icon?.setAttribute('data-lucide', 'cloud-upload');
+    if (label) { label.textContent = '동기화중'; label.style.color = '#10B981'; }
+    if (btn)   btn.classList.add('on');
+  } else {
+    icon?.setAttribute('data-lucide', 'cloud');
+    if (label) { label.textContent = '동기화'; label.style.color = ''; }
+    if (btn)   btn.classList.remove('on');
+  }
+  refreshIcons();
+}
+
+function renderSyncModal() {
+  const cfg     = getSyncConfig();
+  const hasUrl  = !!cfg?.dbUrl;
+  const hasCode = !!cfg?.code;
+
+  const statusEl = document.getElementById('syncStatus');
+  if (statusEl) {
+    if (hasCode) {
+      statusEl.innerHTML = `<span style="font-weight:700;color:#10B981">● 동기화 중</span>
+        <span style="font-weight:800;background:var(--bg-raised);padding:.2rem .625rem;border-radius:.375rem;font-family:monospace;letter-spacing:.12em">${cfg.code}</span>`;
+    } else if (hasUrl) {
+      statusEl.innerHTML = `<span style="color:var(--t4)">● 연결 안됨 — 아래서 코드를 생성하거나 입력하세요</span>`;
+    } else {
+      statusEl.innerHTML = `<span style="color:var(--t5)">● Firebase URL 미설정 — 아래 설정 방법을 참고하세요</span>`;
+    }
+  }
+
+  document.getElementById('syncConnected')?.classList.toggle('hidden', !hasCode);
+  document.getElementById('syncDisconnected')?.classList.toggle('hidden', hasCode);
+
+  if (hasCode) {
+    const codeEl = document.getElementById('syncCodeDisplay');
+    if (codeEl) codeEl.textContent = cfg.code;
+  }
+  const urlInput = document.getElementById('syncDbUrl');
+  if (urlInput && cfg?.dbUrl) urlInput.value = cfg.dbUrl;
+}
+
+window.openSyncModal = () => {
+  renderSyncModal();
+  document.getElementById('syncModal').classList.remove('hidden');
+  refreshIcons();
+};
+window.closeSyncModal  = () => document.getElementById('syncModal').classList.add('hidden');
+window.toggleSyncHelp  = () => document.getElementById('syncHelp')?.classList.toggle('hidden');
+
+window.saveSyncDbUrl = () => {
+  const url = document.getElementById('syncDbUrl')?.value.trim();
+  if (!url || !url.startsWith('https://') || !url.includes('firebaseio.com')) {
+    showToast('올바른 Firebase URL을 입력해주세요.'); return;
+  }
+  const existing = getSyncConfig();
+  saveSyncConfig({ ...(existing || {}), dbUrl: url });
+  renderSyncModal();
+  showToast('Firebase URL 저장됨 ✓');
+};
+
+window.createSyncRoom = async () => {
+  const cfg = getSyncConfig();
+  if (!cfg?.dbUrl) { showToast('먼저 Firebase URL을 저장해주세요.'); return; }
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const code  = Array.from({length: 6}, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+  showToast('코드 생성 중…');
+  const ok = await fbSet(cfg.dbUrl, code, getAllSyncData());
+  if (!ok) { showToast('연결 실패 — Firebase URL과 데이터베이스 규칙을 확인해주세요.'); return; }
+  sync.lastPushTime = Date.now();
+  saveSyncConfig({ ...cfg, code });
+  startSyncPoll();
+  renderSyncModal();
+  updateSyncIndicator();
+  showToast(`동기화 코드 생성됨: ${code}`);
+};
+
+window.joinWithCode = () => {
+  const code = document.getElementById('syncCodeInput')?.value.trim().toUpperCase();
+  if (!code || code.length < 4) { showToast('코드를 입력해주세요.'); return; }
+  const cfg = getSyncConfig();
+  if (!cfg?.dbUrl) { showToast('먼저 Firebase URL을 저장해주세요.'); return; }
+  showConfirm(
+    '코드로 연결',
+    '현재 기기의 데이터가 클라우드 데이터로 교체됩니다. 계속하시겠습니까?',
+    async () => {
+      showToast('연결 중…');
+      const remote = await fbGet(cfg.dbUrl, code);
+      if (!remote) { showToast('코드를 찾을 수 없습니다.'); return; }
+      applyRemoteData(remote);
+      saveSyncConfig({ ...cfg, code });
+      startSyncPoll();
+      window.closeSyncModal();
+      updateSyncIndicator();
+      showToast('동기화 연결됨 ✓');
+    },
+    '연결', 'var(--btn-bg)'
+  );
+};
+
+window.confirmDisconnectSync = () => {
+  showConfirm('동기화 해제', '동기화를 해제합니다. 현재 데이터는 유지됩니다.', () => {
+    stopSyncPoll();
+    const cfg = getSyncConfig();
+    if (cfg) saveSyncConfig({ dbUrl: cfg.dbUrl, code: null });
+    renderSyncModal();
+    updateSyncIndicator();
+    showToast('동기화 해제됨');
+  }, '해제', '#EF4444');
+};
+
+window.copySyncCode = () => {
+  const cfg = getSyncConfig();
+  if (cfg?.code) navigator.clipboard.writeText(cfg.code).then(() => showToast('코드 복사됨 ✓'));
+};
+
 /* ── 초기화 ── */
 document.addEventListener('DOMContentLoaded', () => {
   if (!localStorage.getItem(SK.KW)) saveKwMap(DEFAULT_KEYWORD_MAP);
@@ -1810,6 +2012,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
   syncUI();
   switchTab('dashboard');
+
+  // 동기화 복원
+  const initCfg = getSyncConfig();
+  if (initCfg?.dbUrl && initCfg?.code) {
+    updateSyncIndicator();
+    startSyncPoll();
+    fbGet(initCfg.dbUrl, initCfg.code).then(data => {
+      if (!data) return;
+      sync.applying = true;
+      SYNC_DATA_KEYS.forEach(k => { if (data[k] !== undefined) localStorage.setItem(k, data[k]); });
+      sync.applying = false;
+      switchTab(state.tab);
+    });
+  }
 });
 
 /* ── 전역 함수 등록 ── */
