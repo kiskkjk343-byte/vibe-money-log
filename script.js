@@ -1081,7 +1081,7 @@ function renderFixed() {
 
     return `
       <div style="border:1px solid var(--border);border-radius:.75rem;overflow:hidden;margin-bottom:.5rem">
-        <button onclick="toggleFixedGroup(${JSON.stringify(cat)})"
+        <button onclick="toggleFixedGroup('${cat.replace(/\\/g,'\\\\').replace(/'/g,"\\'")}')"
           style="width:100%;display:flex;align-items:center;gap:.625rem;padding:.625rem .875rem;background:var(--bg-inset);border:none;cursor:pointer;text-align:left;transition:background .15s"
           onmouseover="this.style.background='var(--bg-raised)'" onmouseout="this.style.background='var(--bg-inset)'">
           <span style="width:.5rem;height:.5rem;border-radius:50%;background:${info.color};flex-shrink:0"></span>
@@ -2266,7 +2266,11 @@ window.openCatModal = () => {
   document.getElementById('catMgmtModal').classList.remove('hidden');
   refreshIcons();
 };
-window.closeCatModal = () => document.getElementById('catMgmtModal').classList.add('hidden');
+window.closeCatModal = () => {
+  document.getElementById('catMgmtModal').classList.add('hidden');
+  renderFixed();
+  renderPlanned();
+};
 
 window.addCustomCat = () => {
   const input = document.getElementById('newCatName');
@@ -2282,6 +2286,7 @@ window.addCustomCat = () => {
   input.value = '';
   renderCatModal();
   renderFixed();
+  renderPlanned();
   showToast(`'${name}' 카테고리 추가됨 ✓`);
 };
 
@@ -2295,6 +2300,7 @@ window.removeCustomCat = (name) => {
       saveCustomCats(custom);
       renderCatModal();
       renderFixed();
+      renderPlanned();
       showToast(`'${name}' 카테고리 삭제됨`);
     },
     '삭제', '#EF4444'

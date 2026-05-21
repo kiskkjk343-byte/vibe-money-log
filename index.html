@@ -308,6 +308,11 @@
           </div>
           <div style="display:flex;gap:.5rem">
             <select id="fixedCategory" class="app-input" style="flex:1"></select>
+            <button onclick="openCatModal()" title="카테고리 관리"
+              style="display:flex;align-items:center;gap:.3rem;font-size:.6875rem;font-weight:600;color:var(--t3);background:var(--bg-inset);border:1px solid var(--border);border-radius:.625rem;padding:.4rem .625rem;cursor:pointer;flex-shrink:0;transition:background .15s"
+              onmouseover="this.style.background='var(--bg-raised)'" onmouseout="this.style.background='var(--bg-inset)'">
+              <i data-lucide="tag" style="width:12px;height:12px"></i>관리
+            </button>
             <button onclick="addFixed()" class="btn-sm">추가하기</button>
           </div>
         </div>
@@ -402,6 +407,11 @@
               <span id="planDateLabel" style="color:var(--t4)">날짜 선택</span>
             </button>
             <select id="planCategory" class="app-input" style="flex:1;min-width:88px"></select>
+            <button onclick="openCatModal()" title="카테고리 관리"
+              style="display:flex;align-items:center;gap:.3rem;font-size:.6875rem;font-weight:600;color:var(--t3);background:var(--bg-inset);border:1px solid var(--border);border-radius:.625rem;padding:.4rem .625rem;cursor:pointer;flex-shrink:0;transition:background .15s"
+              onmouseover="this.style.background='var(--bg-raised)'" onmouseout="this.style.background='var(--bg-inset)'">
+              <i data-lucide="tag" style="width:12px;height:12px"></i>관리
+            </button>
             <button onclick="addPlanned()" class="btn-sm" style="flex-shrink:0">추가하기</button>
           </div>
         </div>
