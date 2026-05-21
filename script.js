@@ -11,6 +11,17 @@ const CATEGORIES = {
   '기타':         { color:'#94A3B8', bg:'#F8FAFC', darkBg:'#141b2d', icon:'help-circle'   },
 };
 
+const CUSTOM_CAT_COLORS = [
+  { color:'#F59E0B', bg:'#FFFBEB', darkBg:'#2d1f04', icon:'tag' },
+  { color:'#06B6D4', bg:'#ECFEFF', darkBg:'#062228', icon:'tag' },
+  { color:'#14B8A6', bg:'#F0FDFA', darkBg:'#042822', icon:'tag' },
+  { color:'#84CC16', bg:'#F7FEE7', darkBg:'#1a2b05', icon:'tag' },
+  { color:'#FB923C', bg:'#FFF7ED', darkBg:'#2d1200', icon:'tag' },
+  { color:'#A78BFA', bg:'#F5F3FF', darkBg:'#1e1040', icon:'tag' },
+  { color:'#F43F5E', bg:'#FFF1F2', darkBg:'#2d0a12', icon:'tag' },
+  { color:'#64748B', bg:'#F8FAFC', darkBg:'#141b2d', icon:'tag' },
+];
+
 // 상세 내역 탭 그룹 — '전체'는 null(필터 없음), 나머지는 해당 카테고리 배열
 const CAT_GROUPS_FOR_TABS = {
   '전체':      null,
@@ -21,14 +32,14 @@ const CAT_GROUPS_FOR_TABS = {
   '기타':      ['기타'],
 };
 
-const SK = { TX: 'vml_transactions', KW: 'vml_keyword_map', DARK: 'vml_dark', LAYOUT: 'vml_layout', FIXED: 'vml_fixed', INCOME: 'vml_income', MEMBERS: 'vml_members', PLAN: 'vml_planned' };
+const SK = { TX: 'vml_transactions', KW: 'vml_keyword_map', DARK: 'vml_dark', LAYOUT: 'vml_layout', FIXED: 'vml_fixed', INCOME: 'vml_income', MEMBERS: 'vml_members', PLAN: 'vml_planned', CUSTOM_CATS: 'vml_custom_cats' };
 
 const MEMBER_COLORS = ['#6366F1','#EC4899','#10B981','#F59E0B','#14B8A6','#8B5CF6','#EF4444','#F97316'];
 
 /* ── 동기화 설정 ── */
 const FIREBASE_DB_URL = 'https://money-loge-default-rtdb.firebaseio.com';
 const SK_SYNC         = 'vml_sync';
-const SYNC_DATA_KEYS  = [SK.TX, SK.KW, SK.FIXED, SK.INCOME, SK.MEMBERS, SK.PLAN];
+const SYNC_DATA_KEYS  = [SK.TX, SK.KW, SK.FIXED, SK.INCOME, SK.MEMBERS, SK.PLAN, SK.CUSTOM_CATS];
 const getSyncCode     = () => localStorage.getItem(SK_SYNC) || null;
 const saveSyncCode    = code => code ? localStorage.setItem(SK_SYNC, code) : localStorage.removeItem(SK_SYNC);
 const sync = { pushTimer: null, pollTimer: null, lastPushTime: 0, applying: false };
@@ -77,6 +88,9 @@ const getPlanned  = () => JSON.parse(localStorage.getItem(SK.PLAN)    || '[]');
 const savePlanned = arr => localStorage.setItem(SK.PLAN,   JSON.stringify(arr));
 const getMembers  = () => JSON.parse(localStorage.getItem(SK.MEMBERS)  || '[]');
 const saveMembers = arr => localStorage.setItem(SK.MEMBERS, JSON.stringify(arr));
+const getCustomCats  = () => JSON.parse(localStorage.getItem(SK.CUSTOM_CATS) || '{}');
+const saveCustomCats = obj => localStorage.setItem(SK.CUSTOM_CATS, JSON.stringify(obj));
+const getAllCategories = () => ({ ...CATEGORIES, ...getCustomCats() });
 const saveMth   = (ym, data) => {
   const all = JSON.parse(localStorage.getItem(SK.TX) || '{}');
   all[ym] = data;
@@ -951,14 +965,14 @@ function renderKeywords() {
   `;
 
   const sel = document.getElementById('newCategory');
-  if (sel) sel.innerHTML = Object.keys(CATEGORIES).map(c => `<option value="${c}">${c}</option>`).join('');
+  if (sel) sel.innerHTML = Object.keys(getAllCategories()).map(c => `<option value="${c}">${c}</option>`).join('');
 }
 
 function openCategoryModal(idx) {
   state.modalIdx = idx;
   const tx = state.pending[idx];
   document.getElementById('modalMerchant').textContent = `${tx.merchant} (${fmtAmt(tx.amount)})`;
-  document.getElementById('categoryOptions').innerHTML = Object.keys(CATEGORIES).map(cat => `
+  document.getElementById('categoryOptions').innerHTML = Object.keys(getAllCategories()).map(cat => `
     <button onclick="selectCategory('${cat}')" style="padding:8px;font-size:12px;border:1px solid var(--border);border-radius:8px;background:var(--bg-card);cursor:pointer;">${cat}</button>
   `).join('');
   document.getElementById('categoryModal').classList.remove('hidden');
@@ -967,15 +981,21 @@ function openCategoryModal(idx) {
 function closeModal() { document.getElementById('categoryModal').classList.add('hidden'); }
 
 /* ── 고정지출 계획 ── */
+const fixedGroupState = {};
+
 function renderFixed() {
-  const list  = getFixed();
-  const total = list.reduce((s, i) => s + i.amount, 0);
+  const list    = getFixed();
+  const total   = list.reduce((s, i) => s + i.amount, 0);
+  const allCats = getAllCategories();
 
   // 카테고리 셀렉트
   const sel = document.getElementById('fixedCategory');
-  if (sel) sel.innerHTML = Object.keys(CATEGORIES).map(c =>
-    `<option value="${c}"${c === '고정지출' ? ' selected' : ''}>${c}</option>`
-  ).join('');
+  if (sel) {
+    const cur = sel.value;
+    sel.innerHTML = Object.keys(allCats).map(c =>
+      `<option value="${c}"${c === (cur || '고정지출') ? ' selected' : ''}>${c}</option>`
+    ).join('');
+  }
 
   // 히어로 총액
   const totalEl = document.getElementById('fixedTotalAmt');
@@ -994,7 +1014,7 @@ function renderFixed() {
       const sorted = Object.entries(byCat).sort((a, b) => b[1] - a[1]);
       bdEl.innerHTML = sorted.map(([cat, amt]) => {
         const pct  = Math.round(amt / total * 100);
-        const info = CATEGORIES[cat] || { color:'#94A3B8' };
+        const info = allCats[cat] || { color:'#94A3B8' };
         return `
           <div style="margin-bottom:.625rem">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.25rem">
@@ -1015,41 +1035,74 @@ function renderFixed() {
     }
   }
 
-  // 항목 목록
+  // 항목 목록 — 카테고리별 아코디언
   const container = document.getElementById('fixedList');
-  if (container) {
-    if (list.length === 0) {
-      container.innerHTML = `<p style="font-size:.8125rem;color:var(--t5);text-align:center;padding:.75rem 0">아직 등록된 항목이 없습니다</p>`;
-    } else {
-      container.innerHTML = list.map(item => {
-        const info = CATEGORIES[item.category] || { color:'#94A3B8' };
-        const pct  = total > 0 ? Math.round(item.amount / total * 100) : 0;
-        return `
-          <div id="fixedRow-${item.id}" class="divider-row" style="display:flex;align-items:center;gap:.625rem">
-            <span style="width:.375rem;height:.375rem;border-radius:50%;background:${info.color};flex-shrink:0"></span>
-            <div style="flex:1;min-width:0">
-              <div style="font-size:.875rem;font-weight:700;color:var(--t1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${item.name}</div>
-              <div style="font-size:.6875rem;font-weight:600;color:${info.color}">${item.category}</div>
-            </div>
-            <span class="num" style="font-size:.875rem;font-weight:800;color:var(--t1);flex-shrink:0">${fmtAmt(item.amount)}</span>
-            <span class="num" style="font-size:.625rem;color:var(--t5);min-width:1.75rem;text-align:right">${pct}%</span>
-            <button onclick="editFixed('${item.id}')" title="수정"
-              style="color:var(--t5);background:none;border:none;cursor:pointer;padding:.25rem;border-radius:.375rem;flex-shrink:0;display:flex;align-items:center;transition:color .15s"
-              onmouseover="this.style.color='var(--t1)'" onmouseout="this.style.color='var(--t5)'">
-              <i data-lucide="pencil" style="width:13px;height:13px"></i>
-            </button>
-            <button onclick="removeFixed('${item.id}')" title="삭제"
-              style="color:var(--t5);background:none;border:none;cursor:pointer;padding:.25rem;border-radius:.375rem;flex-shrink:0;display:flex;align-items:center;transition:color .15s"
-              onmouseover="this.style.color='#EF4444'" onmouseout="this.style.color='var(--t5)'">
-              <i data-lucide="trash-2" style="width:13px;height:13px"></i>
-            </button>
-          </div>`;
-      }).join('');
-    }
+  if (!container) { refreshIcons(); return; }
+
+  if (list.length === 0) {
+    container.innerHTML = `<p style="font-size:.8125rem;color:var(--t5);text-align:center;padding:.75rem 0">아직 등록된 항목이 없습니다</p>`;
+    refreshIcons();
+    return;
   }
+
+  // 카테고리별 그룹화
+  const grouped = {};
+  for (const item of list) {
+    if (!grouped[item.category]) grouped[item.category] = [];
+    grouped[item.category].push(item);
+  }
+
+  container.innerHTML = Object.entries(grouped).map(([cat, items]) => {
+    const info      = allCats[cat] || { color:'#94A3B8' };
+    const catTotal  = items.reduce((s, i) => s + i.amount, 0);
+    const collapsed = fixedGroupState[cat] || false;
+
+    const itemsHtml = items.map(item => {
+      const pct = total > 0 ? Math.round(item.amount / total * 100) : 0;
+      return `
+        <div id="fixedRow-${item.id}" class="divider-row" style="display:flex;align-items:center;gap:.625rem;padding:.5rem .875rem">
+          <div style="flex:1;min-width:0">
+            <div style="font-size:.875rem;font-weight:700;color:var(--t1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${item.name}</div>
+          </div>
+          <span class="num" style="font-size:.875rem;font-weight:800;color:var(--t1);flex-shrink:0">${fmtAmt(item.amount)}</span>
+          <span class="num" style="font-size:.625rem;color:var(--t5);min-width:1.75rem;text-align:right">${pct}%</span>
+          <button onclick="editFixed('${item.id}')" title="수정"
+            style="color:var(--t5);background:none;border:none;cursor:pointer;padding:.25rem;border-radius:.375rem;flex-shrink:0;display:flex;align-items:center;transition:color .15s"
+            onmouseover="this.style.color='var(--t1)'" onmouseout="this.style.color='var(--t5)'">
+            <i data-lucide="pencil" style="width:13px;height:13px"></i>
+          </button>
+          <button onclick="removeFixed('${item.id}')" title="삭제"
+            style="color:var(--t5);background:none;border:none;cursor:pointer;padding:.25rem;border-radius:.375rem;flex-shrink:0;display:flex;align-items:center;transition:color .15s"
+            onmouseover="this.style.color='#EF4444'" onmouseout="this.style.color='var(--t5)'">
+            <i data-lucide="trash-2" style="width:13px;height:13px"></i>
+          </button>
+        </div>`;
+    }).join('');
+
+    return `
+      <div style="border:1px solid var(--border);border-radius:.75rem;overflow:hidden;margin-bottom:.5rem">
+        <button onclick="toggleFixedGroup(${JSON.stringify(cat)})"
+          style="width:100%;display:flex;align-items:center;gap:.625rem;padding:.625rem .875rem;background:var(--bg-inset);border:none;cursor:pointer;text-align:left;transition:background .15s"
+          onmouseover="this.style.background='var(--bg-raised)'" onmouseout="this.style.background='var(--bg-inset)'">
+          <span style="width:.5rem;height:.5rem;border-radius:50%;background:${info.color};flex-shrink:0"></span>
+          <span style="flex:1;font-size:.875rem;font-weight:700;color:var(--t1)">${cat}</span>
+          <span class="num" style="font-size:.8125rem;font-weight:800;color:var(--t2)">${fmtAmt(catTotal)}</span>
+          <span style="font-size:.6875rem;color:var(--t4);margin-left:.25rem">${items.length}건</span>
+          <i data-lucide="${collapsed ? 'chevron-right' : 'chevron-down'}" style="width:14px;height:14px;color:var(--t4);flex-shrink:0;margin-left:.25rem"></i>
+        </button>
+        <div style="${collapsed ? 'display:none;' : ''}padding:.25rem 0">
+          ${itemsHtml}
+        </div>
+      </div>`;
+  }).join('');
 
   refreshIcons();
 }
+
+window.toggleFixedGroup = (cat) => {
+  fixedGroupState[cat] = !fixedGroupState[cat];
+  renderFixed();
+};
 
 window.addFixed = () => {
   const name   = document.getElementById('fixedName').value.trim();
@@ -1095,7 +1148,7 @@ window.editFixed = (id) => {
       </div>
       <div style="display:flex;gap:.375rem;align-items:center">
         <select id="feC-${id}" class="app-input" style="flex:1;padding:.45rem .625rem;font-size:.8125rem">
-          ${Object.keys(CATEGORIES).map(c => `<option value="${c}"${c === item.category ? ' selected' : ''}>${c}</option>`).join('')}
+          ${Object.keys(getAllCategories()).map(c => `<option value="${c}"${c === item.category ? ' selected' : ''}>${c}</option>`).join('')}
         </select>
         <button onclick="saveFixedEdit('${id}')" class="btn-sm">저장</button>
         <button onclick="renderFixed()"
@@ -1311,11 +1364,12 @@ function renderPlanned() {
   const countEl = document.getElementById('planCount');
   if (countEl) countEl.textContent = `${items.length}건`;
 
-  // 카테고리 셀렉트 초기화 (빈 경우에만)
+  // 카테고리 셀렉트
   const sel = document.getElementById('planCategory');
-  if (sel && !sel.innerHTML) {
-    sel.innerHTML = Object.keys(CATEGORIES).map(c =>
-      `<option value="${c}"${c === '경조사' ? ' selected' : ''}>${c}</option>`
+  if (sel) {
+    const cur = sel.value;
+    sel.innerHTML = Object.keys(getAllCategories()).map(c =>
+      `<option value="${c}"${c === (cur || '경조사') ? ' selected' : ''}>${c}</option>`
     ).join('');
   }
 
@@ -1332,7 +1386,7 @@ function renderPlanned() {
     const diff   = dday(item.date);
     const isPast = diff < 0;
     const isToday = diff === 0;
-    const catInfo = CATEGORIES[item.category] || { color: '#94A3B8' };
+    const catInfo = getAllCategories()[item.category] || { color: '#94A3B8' };
 
     let ddayText, ddayBg, ddayFg;
     if (isToday) {
@@ -1486,7 +1540,7 @@ window.editPlanned = (id) => {
   row.style.paddingTop = '.5rem';
   row.style.paddingBottom = '.5rem';
   row.style.opacity = '1';
-  const catOpts = Object.keys(CATEGORIES).map(c =>
+  const catOpts = Object.keys(getAllCategories()).map(c =>
     `<option value="${c}"${c === item.category ? ' selected' : ''}>${c}</option>`
   ).join('');
   row.innerHTML = `
@@ -2175,4 +2229,74 @@ window.loadDemoData = () => {
   all[ym] = [...(all[ym] || []).filter(t => !t._isDemo), ...demo];
   localStorage.setItem(SK.TX, JSON.stringify(all));
   renderDashboard();
+};
+
+/* ── 카테고리 관리 ── */
+function renderCatModal() {
+  const custom    = getCustomCats();
+  const container = document.getElementById('catMgmtList');
+  if (!container) return;
+
+  const builtinHtml = Object.entries(CATEGORIES).map(([name, info]) => `
+    <div style="display:flex;align-items:center;gap:.625rem;padding:.5rem 0;border-bottom:1px solid var(--divider)">
+      <span style="width:.5rem;height:.5rem;border-radius:50%;background:${info.color};flex-shrink:0"></span>
+      <span style="flex:1;font-size:.875rem;font-weight:600;color:var(--t2)">${name}</span>
+      <span style="font-size:.625rem;color:var(--t5);padding:.2rem .5rem;background:var(--bg-inset);border-radius:.375rem">기본</span>
+    </div>`).join('');
+
+  const customEntries = Object.entries(custom);
+  const customHtml = customEntries.length === 0 ? '' : customEntries.map(([name, info]) => `
+    <div style="display:flex;align-items:center;gap:.625rem;padding:.5rem 0;border-bottom:1px solid var(--divider)">
+      <span style="width:.5rem;height:.5rem;border-radius:50%;background:${info.color};flex-shrink:0"></span>
+      <span style="flex:1;font-size:.875rem;font-weight:600;color:var(--t1)">${name}</span>
+      <button onclick="removeCustomCat(${JSON.stringify(name)})"
+        style="color:#F87171;background:none;border:none;cursor:pointer;padding:.25rem;border-radius:.375rem;display:flex;align-items:center;transition:color .15s"
+        onmouseover="this.style.color='#EF4444'" onmouseout="this.style.color='#F87171'">
+        <i data-lucide="trash-2" style="width:13px;height:13px"></i>
+      </button>
+    </div>`).join('');
+
+  container.innerHTML = builtinHtml +
+    (customEntries.length > 0 ? `<p style="font-size:.6875rem;font-weight:700;color:var(--t3);margin:.75rem 0 .25rem">사용자 정의</p>${customHtml}` : '');
+  refreshIcons();
+}
+
+window.openCatModal = () => {
+  renderCatModal();
+  document.getElementById('catMgmtModal').classList.remove('hidden');
+  refreshIcons();
+};
+window.closeCatModal = () => document.getElementById('catMgmtModal').classList.add('hidden');
+
+window.addCustomCat = () => {
+  const input = document.getElementById('newCatName');
+  if (!input) return;
+  const name = input.value.trim();
+  if (!name) { showToast('카테고리 이름을 입력해주세요.'); return; }
+  const allCats = getAllCategories();
+  if (allCats[name]) { showToast('이미 존재하는 카테고리입니다.'); return; }
+  const custom    = getCustomCats();
+  const colorInfo = CUSTOM_CAT_COLORS[Object.keys(custom).length % CUSTOM_CAT_COLORS.length];
+  custom[name]    = colorInfo;
+  saveCustomCats(custom);
+  input.value = '';
+  renderCatModal();
+  renderFixed();
+  showToast(`'${name}' 카테고리 추가됨 ✓`);
+};
+
+window.removeCustomCat = (name) => {
+  showConfirm(
+    `'${name}' 삭제`,
+    '카테고리를 삭제해도 기존 항목은 유지됩니다.',
+    () => {
+      const custom = getCustomCats();
+      delete custom[name];
+      saveCustomCats(custom);
+      renderCatModal();
+      renderFixed();
+      showToast(`'${name}' 카테고리 삭제됨`);
+    },
+    '삭제', '#EF4444'
+  );
 };
