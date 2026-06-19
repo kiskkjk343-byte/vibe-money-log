@@ -1947,21 +1947,36 @@ function renderMemberPills(allTxs) {
   const pillsEl = document.getElementById('memberPills');
   if (!pillsEl) return;
 
-  const active = (allTxs || []).filter(t => !t.isCancelled);
-  const isAll  = state.activeMember === 'all';
-  pillsEl.innerHTML = [
-    `<button class="member-pill${isAll ? ' member-pill-on' : ''}" onclick="switchMember('all')">전체 합산</button>`,
-    ...members.map(m => {
-      const amt  = active.filter(t => t.memberId === m.id).reduce((s,t) => s+t.amount, 0);
-      const isOn = state.activeMember === m.id;
-      return `<button class="member-pill${isOn ? ' member-pill-on' : ''}"
-        style="${isOn ? `background:${m.color};border-color:${m.color}` : ''}"
+  const active   = (allTxs || []).filter(t => !t.isCancelled);
+  const isAll    = state.activeMember === 'all';
+  const allTotal = active.reduce((s, t) => s + t.amount, 0);
+
+  // 전체 칩
+  const allChip = `
+    <button class="mber-chip${isAll ? ' mber-chip-on' : ''}"
+      style="${isAll ? 'background:var(--btn-bg);color:white' : 'color:var(--t2)'}"
+      onclick="switchMember('all')">
+      <span class="mber-avatar" style="background:${isAll ? 'rgba(255,255,255,.18)' : 'var(--bg-inset)'};color:${isAll ? 'white' : 'var(--t3)'}">전</span>
+      <span class="mber-name">전체</span>
+      ${allTotal > 0 ? `<span class="mber-amt">${shortFmt(allTotal)}</span>` : ''}
+    </button>`;
+
+  // 멤버별 칩
+  const memberChips = members.map(m => {
+    const mAmt = active.filter(t => t.memberId === m.id).reduce((s,t) => s+t.amount, 0);
+    const isOn = state.activeMember === m.id;
+    const initials = m.name.slice(0, 1);
+    return `
+      <button class="mber-chip${isOn ? ' mber-chip-on' : ''}"
+        style="${isOn ? `background:${m.color};color:white` : 'color:var(--t2)'}"
         onclick="switchMember('${m.id}')">
-        <span style="width:.4rem;height:.4rem;border-radius:50%;background:${isOn ? 'rgba(255,255,255,.8)' : m.color};display:inline-block;flex-shrink:0"></span>
-        ${m.name}${amt > 0 ? `<span style="opacity:.75;font-weight:500"> ${shortFmt(amt)}</span>` : ''}
+        <span class="mber-avatar" style="background:${isOn ? 'rgba(255,255,255,.22)' : m.color};color:white">${initials}</span>
+        <span class="mber-name">${m.name}</span>
+        ${mAmt > 0 ? `<span class="mber-amt">${shortFmt(mAmt)}</span>` : ''}
       </button>`;
-    }),
-  ].join('');
+  });
+
+  pillsEl.innerHTML = [allChip, ...memberChips].join('');
   refreshIcons();
 }
 

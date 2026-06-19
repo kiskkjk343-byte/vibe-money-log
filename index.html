@@ -96,11 +96,13 @@
   <div id="tab-dashboard" class="tab-content hidden">
 
     <!-- 멤버 필터 (멤버 설정 시 표시) -->
-    <div id="memberFilterRow" class="hidden" style="padding:.625rem 1.25rem .125rem;display:flex;align-items:center;justify-content:space-between;gap:.5rem;flex-wrap:wrap">
-      <div id="memberPills" style="display:flex;gap:.4rem;flex-wrap:wrap;align-items:center"></div>
-      <button onclick="openMemberModal()" style="display:flex;align-items:center;gap:.3rem;font-size:.6875rem;font-weight:600;color:var(--t3);background:var(--bg-inset);border:1px solid var(--border);border-radius:.5rem;padding:.3rem .625rem;cursor:pointer;white-space:nowrap;flex-shrink:0;transition:background .15s" onmouseover="this.style.background='var(--bg-raised)'" onmouseout="this.style.background='var(--bg-inset)'">
-        <i data-lucide="users" style="width:12px;height:12px"></i>멤버 관리
-      </button>
+    <div id="memberFilterRow" class="hidden" style="padding:.5rem 1.25rem .625rem;border-bottom:1px solid var(--divider)">
+      <div style="display:flex;align-items:center;gap:.5rem">
+        <div id="memberPills" style="display:flex;gap:.375rem;align-items:center;overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none;flex:1;min-width:0;padding-bottom:1px"></div>
+        <button onclick="openMemberModal()" class="mber-manage-btn" title="멤버 관리">
+          <i data-lucide="users-round" style="width:13px;height:13px"></i>
+        </button>
+      </div>
     </div>
 
     <div class="dash-grid">
