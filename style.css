@@ -203,6 +203,14 @@ html.pc-mode .dash-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1r
 .mber-name { color: inherit; font-weight: 700; }
 .mber-amt  { font-weight: 500; font-family: var(--font-num, inherit); opacity: .8; font-size: .6875rem; }
 
+/* ── 수입 서브탭 ── */
+.income-sub-btn {
+  padding: .625rem 0; font-size: .8125rem; font-weight: 700; color: var(--t4);
+  border-bottom: 2px solid transparent; background: none; border-left: none;
+  border-right: none; border-top: none; cursor: pointer; white-space: nowrap;
+  transition: all .15s;
+}
+
 /* ── 멤버 관리 아이콘 버튼 ── */
 .mber-manage-btn {
   width: 2rem; height: 2rem; border-radius: 50%;

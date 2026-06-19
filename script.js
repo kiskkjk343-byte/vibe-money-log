@@ -32,14 +32,14 @@ const CAT_GROUPS_FOR_TABS = {
   '기타':      ['기타'],
 };
 
-const SK = { TX: 'vml_transactions', KW: 'vml_keyword_map', DARK: 'vml_dark', LAYOUT: 'vml_layout', FIXED: 'vml_fixed', INCOME: 'vml_income', MEMBERS: 'vml_members', PLAN: 'vml_planned', CUSTOM_CATS: 'vml_custom_cats' };
+const SK = { TX: 'vml_transactions', KW: 'vml_keyword_map', DARK: 'vml_dark', LAYOUT: 'vml_layout', FIXED: 'vml_fixed', INCOME: 'vml_income', MEMBERS: 'vml_members', PLAN: 'vml_planned', CUSTOM_CATS: 'vml_custom_cats', PLAN_INCOME: 'vml_planned_income' };
 
 const MEMBER_COLORS = ['#6366F1','#EC4899','#10B981','#F59E0B','#14B8A6','#8B5CF6','#EF4444','#F97316'];
 
 /* ── 동기화 설정 ── */
 const FIREBASE_DB_URL = 'https://money-loge-default-rtdb.firebaseio.com';
 const SK_SYNC         = 'vml_sync';
-const SYNC_DATA_KEYS  = [SK.TX, SK.KW, SK.FIXED, SK.INCOME, SK.MEMBERS, SK.PLAN, SK.CUSTOM_CATS];
+const SYNC_DATA_KEYS  = [SK.TX, SK.KW, SK.FIXED, SK.INCOME, SK.MEMBERS, SK.PLAN, SK.CUSTOM_CATS, SK.PLAN_INCOME];
 const getSyncCode     = () => localStorage.getItem(SK_SYNC) || null;
 const saveSyncCode    = code => code ? localStorage.setItem(SK_SYNC, code) : localStorage.removeItem(SK_SYNC);
 const sync = { pushTimer: null, pollTimer: null, lastPushTime: 0, applying: false };
@@ -67,6 +67,7 @@ const state = {
   inputMember:  null,
   fixedMember:  'all',
   expenseTab:   'fixed',
+  incomeTab:    'fixed',
 };
 
 /* ── 유틸리티 ── */
@@ -84,8 +85,10 @@ const getKwMap  = () => JSON.parse(localStorage.getItem(SK.KW) || '{}');
 const saveKwMap = m => localStorage.setItem(SK.KW, JSON.stringify(m));
 const getFixed   = () => JSON.parse(localStorage.getItem(SK.FIXED)  || '[]');
 const saveFixed  = arr => localStorage.setItem(SK.FIXED, JSON.stringify(arr));
-const getIncome   = () => JSON.parse(localStorage.getItem(SK.INCOME)   || '[]');
-const saveIncome  = arr => localStorage.setItem(SK.INCOME, JSON.stringify(arr));
+const getIncome        = () => JSON.parse(localStorage.getItem(SK.INCOME)       || '[]');
+const saveIncome       = arr => localStorage.setItem(SK.INCOME, JSON.stringify(arr));
+const getPlannedIncome = () => JSON.parse(localStorage.getItem(SK.PLAN_INCOME)  || '[]');
+const savePlannedIncome= arr => localStorage.setItem(SK.PLAN_INCOME, JSON.stringify(arr));
 const getPlanned  = () => JSON.parse(localStorage.getItem(SK.PLAN)    || '[]');
 const savePlanned = arr => localStorage.setItem(SK.PLAN,   JSON.stringify(arr));
 const getMembers  = () => JSON.parse(localStorage.getItem(SK.MEMBERS)  || '[]');
@@ -770,7 +773,9 @@ function renderDashboard() {
   document.getElementById('monthLabel').textContent  = fmtYM(state.ym);
   const txCountEl = document.getElementById('txCount');
   if (txCountEl) {
-    const incomeTotal = getIncome().reduce((s, i) => s + i.amount, 0);
+    const [_y, _m] = state.ym.split('-').map(Number);
+    const incomeTotal = getIncome().reduce((s, i) => s + i.amount, 0)
+      + getPlannedIncome().filter(p => { const d=new Date(p.date); return d.getFullYear()===_y && d.getMonth()+1===_m; }).reduce((s,i)=>s+i.amount,0);
     if (incomeTotal > 0 && total > 0) {
       const ratio = Math.round(total / incomeTotal * 100);
       const col = ratio > 80 ? '#EF4444' : ratio > 50 ? '#F59E0B' : '#10B981';
@@ -874,12 +879,14 @@ function renderBudgetSummary(activeTxs) {
   const el = document.getElementById('budgetSummary');
   if (!el) return;
 
-  const incomeTotal = getIncome().reduce((s, i) => s + i.amount, 0);
+  const [curY, curM] = state.ym.split('-').map(Number);
+  const fixedIncomeTotal    = getIncome().reduce((s, i) => s + i.amount, 0);
+  const plannedIncomeThisM  = getPlannedIncome().filter(p => { const d=new Date(p.date); return d.getFullYear()===curY && d.getMonth()+1===curM; });
+  const incomeTotal         = fixedIncomeTotal + plannedIncomeThisM.reduce((s,i)=>s+i.amount,0);
   const fixedList   = getFixed();
   const fixedTotal  = fixedList.reduce((s, i) => s + i.amount, 0);
 
   // 이번 달에 해당하는 예정지출만 포함
-  const [curY, curM] = state.ym.split('-').map(Number);
   const planList  = getPlanned().filter(item => {
     const d = new Date(item.date);
     return d.getFullYear() === curY && d.getMonth() + 1 === curM;
@@ -1469,8 +1476,30 @@ window.saveFixedEdit = (id) => {
   showToast(`${name} 수정됨 ✓`);
 };
 
-/* ── 수입 설정 ── */
+/* ── 수입 관리 ── */
 function renderIncome() {
+  switchIncomeTab(state.incomeTab || 'fixed');
+}
+
+function switchIncomeTab(subTab) {
+  state.incomeTab = subTab;
+  document.querySelectorAll('.income-sub-content').forEach(el => el.classList.add('hidden'));
+  document.getElementById(`income-${subTab}`)?.classList.remove('hidden');
+  document.querySelectorAll('.income-sub-btn').forEach(btn => {
+    const isActive = btn.id === `incSubBtn-${subTab}`;
+    btn.style.color        = isActive ? 'var(--t1)' : 'var(--t4)';
+    btn.style.borderBottom = isActive ? '2px solid var(--t1)' : '2px solid transparent';
+    btn.style.fontWeight   = isActive ? '800' : '700';
+  });
+  if (subTab === 'fixed') renderFixedIncome();
+  if (subTab === 'plan')  renderPlannedIncome();
+  refreshIcons();
+}
+window.switchIncomeTab = switchIncomeTab;
+
+/* 고정수입 */
+function renderFixedIncome() {
+  const members  = getMembers();
   const incList  = getIncome();
   const fixList  = getFixed();
   const incTotal = incList.reduce((s, i) => s + i.amount, 0);
@@ -1493,7 +1522,7 @@ function renderIncome() {
       vsEl.innerHTML = `
         <div style="margin-bottom:.5rem">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.25rem">
-            <span style="font-size:.75rem;font-weight:600;color:var(--t2)">월 수입</span>
+            <span style="font-size:.75rem;font-weight:600;color:var(--t2)">월 수입 (고정)</span>
             <span class="num" style="font-size:.75rem;font-weight:700;color:var(--color-income)">${fmtAmt(incTotal)}</span>
           </div>
           <div style="background:var(--bg-inset);border-radius:9999px;height:6px">
@@ -1520,39 +1549,59 @@ function renderIncome() {
     }
   }
 
+  // 멤버 셀렉트 갱신
+  const memRow = document.getElementById('incomeMemberSelRow');
+  const memSel = document.getElementById('incomeMemberSel');
+  if (memRow && memSel) {
+    if (members.length > 0) {
+      memRow.style.display = 'block';
+      memSel.innerHTML = `<option value="">공동 (미지정)</option>`
+        + members.map(m => `<option value="${m.id}">${m.name}</option>`).join('');
+    } else {
+      memRow.style.display = 'none';
+    }
+  }
+
   // 수입 항목 목록
+  const memberMap = Object.fromEntries(members.map(m => [m.id, m]));
   const container = document.getElementById('incomeList');
   if (container) {
     if (incList.length === 0) {
       container.innerHTML = `<p style="font-size:.8125rem;color:var(--t5);text-align:center;padding:.75rem 0">아직 등록된 수입이 없습니다</p>`;
     } else {
-      container.innerHTML = incList.map(item => `
-        <div id="incomeRow-${item.id}" class="divider-row" style="display:flex;align-items:center;gap:.625rem">
-          <span style="width:.375rem;height:.375rem;border-radius:50%;background:var(--color-income);flex-shrink:0"></span>
-          <div style="flex:1;min-width:0">
-            <div style="font-size:.875rem;font-weight:700;color:var(--t1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${item.name}</div>
-            ${item.day ? `<div style="font-size:.6875rem;color:var(--t4)">매월 ${item.day}일 입금</div>` : '<div style="font-size:.6875rem;color:var(--t5)">입금일 미설정</div>'}
-          </div>
-          <span class="num" style="font-size:.875rem;font-weight:800;color:var(--color-income);flex-shrink:0">+${fmtAmt(item.amount)}</span>
-          <button onclick="editIncome('${item.id}')" title="수정"
-            style="color:var(--t5);background:none;border:none;cursor:pointer;padding:.25rem;border-radius:.375rem;flex-shrink:0;display:flex;align-items:center;transition:color .15s"
-            onmouseover="this.style.color='var(--t1)'" onmouseout="this.style.color='var(--t5)'">
-            <i data-lucide="pencil" style="width:13px;height:13px"></i>
-          </button>
-          <button onclick="removeIncome('${item.id}')" title="삭제"
-            style="color:var(--t5);background:none;border:none;cursor:pointer;padding:.25rem;border-radius:.375rem;flex-shrink:0;display:flex;align-items:center;transition:color .15s"
-            onmouseover="this.style.color='#EF4444'" onmouseout="this.style.color='var(--t5)'">
-            <i data-lucide="trash-2" style="width:13px;height:13px"></i>
-          </button>
-        </div>
-      `).join('');
+      container.innerHTML = incList.map(item => {
+        const mem = item.memberId ? memberMap[item.memberId] : null;
+        const memBadge = mem
+          ? `<span style="display:inline-flex;align-items:center;gap:.2rem;font-size:.5625rem;font-weight:700;padding:.1rem .4rem;border-radius:9999px;background:${mem.color}20;color:${mem.color};border:1px solid ${mem.color}40">
+               <span style="width:.4rem;height:.4rem;border-radius:50%;background:${mem.color};display:inline-block"></span>${mem.name}
+             </span>`
+          : members.length > 0 ? `<span style="font-size:.5625rem;color:var(--t5)">공동</span>` : '';
+        return `
+          <div id="incomeRow-${item.id}" class="divider-row" style="display:flex;align-items:center;gap:.625rem">
+            <span style="width:.375rem;height:.375rem;border-radius:50%;background:var(--color-income);flex-shrink:0"></span>
+            <div style="flex:1;min-width:0">
+              <div style="font-size:.875rem;font-weight:700;color:var(--t1);display:flex;align-items:center;gap:.375rem;flex-wrap:wrap;overflow:hidden">${item.name} ${memBadge}</div>
+              ${item.day ? `<div style="font-size:.6875rem;color:var(--t4)">매월 ${item.day}일 입금</div>` : '<div style="font-size:.6875rem;color:var(--t5)">입금일 미설정</div>'}
+            </div>
+            <span class="num" style="font-size:.875rem;font-weight:800;color:var(--color-income);flex-shrink:0">+${fmtAmt(item.amount)}</span>
+            <button onclick="editFixedIncome('${item.id}')" title="수정"
+              style="color:var(--t5);background:none;border:none;cursor:pointer;padding:.25rem;border-radius:.375rem;flex-shrink:0;display:flex;align-items:center;transition:color .15s"
+              onmouseover="this.style.color='var(--t1)'" onmouseout="this.style.color='var(--t5)'">
+              <i data-lucide="pencil" style="width:13px;height:13px"></i>
+            </button>
+            <button onclick="removeFixedIncome('${item.id}')" title="삭제"
+              style="color:var(--t5);background:none;border:none;cursor:pointer;padding:.25rem;border-radius:.375rem;flex-shrink:0;display:flex;align-items:center;transition:color .15s"
+              onmouseover="this.style.color='#EF4444'" onmouseout="this.style.color='var(--t5)'">
+              <i data-lucide="trash-2" style="width:13px;height:13px"></i>
+            </button>
+          </div>`;
+      }).join('');
     }
   }
-
   refreshIcons();
 }
 
-window.addIncome = () => {
+window.addFixedIncome = () => {
   const name   = document.getElementById('incomeName').value.trim();
   const amtRaw = document.getElementById('incomeAmount').value.trim();
   const dayRaw = document.getElementById('incomeDay').value.trim();
@@ -1560,27 +1609,31 @@ window.addIncome = () => {
   const amount = parseInt(amtRaw.replace(/[^0-9]/g, ''));
   if (!amount || amount <= 0) { showToast('금액을 올바르게 입력해주세요.'); return; }
   const day = dayRaw ? Math.min(31, Math.max(1, parseInt(dayRaw))) : null;
+  const memSel = document.getElementById('incomeMemberSel');
+  const memberId = memSel ? (memSel.value || null) : null;
   const list = getIncome();
-  list.push({ id: genId(), name, amount, day });
+  list.push({ id: genId(), name, amount, day, memberId });
   saveIncome(list);
   document.getElementById('incomeName').value   = '';
   document.getElementById('incomeAmount').value = '';
   document.getElementById('incomeDay').value    = '';
-  renderIncome();
+  if (memSel) memSel.value = '';
+  renderFixedIncome();
   showToast(`${name} 추가됨 ✓`);
 };
 
-window.removeIncome = (id) => {
+window.removeFixedIncome = (id) => {
   const item = getIncome().find(i => i.id === id);
   showConfirm(
     `${item?.name || '항목'} 삭제`,
     '이 수입 항목을 삭제하시겠습니까?',
-    () => { saveIncome(getIncome().filter(i => i.id !== id)); renderIncome(); },
+    () => { saveIncome(getIncome().filter(i => i.id !== id)); renderFixedIncome(); },
     '삭제', '#EF4444'
   );
 };
 
-window.editIncome = (id) => {
+window.editFixedIncome = (id) => {
+  const members = getMembers();
   const item = getIncome().find(i => i.id === id);
   if (!item) return;
   const row = document.getElementById(`incomeRow-${id}`);
@@ -1588,6 +1641,11 @@ window.editIncome = (id) => {
   row.style.alignItems = 'flex-start';
   row.style.paddingTop = '.5rem';
   row.style.paddingBottom = '.5rem';
+  const memOpts = members.length > 0
+    ? `<option value="">공동 (미지정)</option>` + members.map(m =>
+        `<option value="${m.id}"${m.id === item.memberId ? ' selected' : ''}>${m.name}</option>`
+      ).join('')
+    : '';
   row.innerHTML = `
     <div style="display:flex;flex-direction:column;gap:.5rem;width:100%">
       <div style="display:flex;gap:.5rem">
@@ -1596,12 +1654,13 @@ window.editIncome = (id) => {
         <input id="ieA-${id}" class="app-input" value="${item.amount}"
           style="width:7rem;padding:.45rem .625rem;font-size:.8125rem;text-align:right" placeholder="금액">
       </div>
+      ${members.length > 0 ? `<select id="ieM-${id}" class="app-input" style="padding:.45rem .625rem;font-size:.8125rem">${memOpts}</select>` : ''}
       <div style="display:flex;gap:.375rem;align-items:center">
         <input id="ieD-${id}" class="app-input" type="number" min="1" max="31"
           value="${item.day || ''}" placeholder="입금일 (선택)"
           style="flex:1;padding:.45rem .625rem;font-size:.8125rem">
-        <button onclick="saveIncomeEdit('${id}')" class="btn-sm">저장</button>
-        <button onclick="renderIncome()"
+        <button onclick="saveFixedIncomeEdit('${id}')" class="btn-sm">저장</button>
+        <button onclick="renderFixedIncome()"
           style="font-size:.75rem;font-weight:600;color:var(--t3);background:none;border:none;cursor:pointer;padding:.45rem .5rem;border-radius:.625rem;transition:background .15s"
           onmouseover="this.style.background='var(--bg-raised)'" onmouseout="this.style.background='none'">취소</button>
       </div>
@@ -1609,16 +1668,220 @@ window.editIncome = (id) => {
   document.getElementById(`ieN-${id}`)?.focus();
 };
 
-window.saveIncomeEdit = (id) => {
+window.saveFixedIncomeEdit = (id) => {
   const name   = document.getElementById(`ieN-${id}`)?.value.trim();
   const amtRaw = document.getElementById(`ieA-${id}`)?.value.trim();
   const dayRaw = document.getElementById(`ieD-${id}`)?.value.trim();
+  const memEl  = document.getElementById(`ieM-${id}`);
   if (!name) { showToast('항목명을 입력해주세요.'); return; }
   const amount = parseInt(amtRaw.replace(/[^0-9]/g, ''));
   if (!amount || amount <= 0) { showToast('금액을 올바르게 입력해주세요.'); return; }
   const day = dayRaw ? parseInt(dayRaw) : null;
-  saveIncome(getIncome().map(i => i.id === id ? { ...i, name, amount, day } : i));
-  renderIncome();
+  const memberId = memEl ? (memEl.value || null) : undefined;
+  saveIncome(getIncome().map(i => i.id === id
+    ? { ...i, name, amount, day, ...(memberId !== undefined && { memberId }) }
+    : i));
+  renderFixedIncome();
+  showToast(`${name} 수정됨 ✓`);
+};
+
+/* 예정수입 */
+function renderPlannedIncome() {
+  const members = getMembers();
+  const items   = getPlannedIncome();
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const dday = dateStr => {
+    const d = new Date(dateStr);
+    d.setHours(0, 0, 0, 0);
+    return Math.round((d - today) / 86400000);
+  };
+
+  const [curY, curM] = state.ym.split('-').map(Number);
+  const thisMonthUpcoming = items.filter(item => {
+    const d = new Date(item.date);
+    return d.getFullYear() === curY && d.getMonth() + 1 === curM && dday(item.date) >= 0;
+  });
+  const upcomingTotal = thisMonthUpcoming.reduce((s, i) => s + i.amount, 0);
+
+  const heroAmtEl = document.getElementById('planIncomeHeroAmt');
+  if (heroAmtEl) heroAmtEl.textContent = fmtAmt(upcomingTotal);
+  const heroSubEl = document.getElementById('planIncomeHeroSub');
+  if (heroSubEl) {
+    const cnt = thisMonthUpcoming.length;
+    const todayCnt = thisMonthUpcoming.filter(i => dday(i.date) === 0).length;
+    heroSubEl.textContent = cnt === 0
+      ? '이번 달 남은 예정 수입 없음'
+      : `이번 달 ${cnt}건${todayCnt > 0 ? ` · 오늘 ${todayCnt}건 예정` : ''}`;
+  }
+
+  // 멤버 셀렉트 갱신
+  const memRow = document.getElementById('planIncomeMemberSelRow');
+  const memSel = document.getElementById('planIncomeMemberSel');
+  if (memRow && memSel) {
+    if (members.length > 0) {
+      memRow.style.display = 'block';
+      memSel.innerHTML = `<option value="">공동 (미지정)</option>`
+        + members.map(m => `<option value="${m.id}">${m.name}</option>`).join('');
+    } else {
+      memRow.style.display = 'none';
+    }
+  }
+
+  const countEl = document.getElementById('planIncomeCount');
+  if (countEl) countEl.textContent = `${items.length}건`;
+
+  const container = document.getElementById('planIncomeList');
+  if (!container) return;
+
+  const future   = items.filter(i => dday(i.date) > 0).sort((a,b) => new Date(a.date)-new Date(b.date));
+  const todayArr = items.filter(i => dday(i.date) === 0);
+  const past     = items.filter(i => dday(i.date) < 0).sort((a,b) => new Date(b.date)-new Date(a.date));
+  const sorted   = [...future, ...todayArr, ...past];
+
+  if (sorted.length === 0) {
+    container.innerHTML = `<p style="font-size:.8125rem;color:var(--t5);text-align:center;padding:.75rem 0">아직 등록된 예정 수입이 없습니다</p>`;
+    refreshIcons();
+    return;
+  }
+
+  const memberMap = Object.fromEntries(members.map(m => [m.id, m]));
+  container.innerHTML = sorted.map(item => {
+    const diff    = dday(item.date);
+    const isPast  = diff < 0;
+    const isToday = diff === 0;
+    const mem     = item.memberId ? memberMap[item.memberId] : null;
+
+    let ddayText, ddayBg, ddayFg;
+    if (isToday) {
+      ddayText = 'D-Day'; ddayBg = '#10B981'; ddayFg = '#fff';
+    } else if (isPast) {
+      ddayText = `D+${Math.abs(diff)}`; ddayBg = 'var(--bg-raised)'; ddayFg = 'var(--t5)';
+    } else if (diff <= 7) {
+      ddayText = `D-${diff}`; ddayBg = '#EFF6FF'; ddayFg = '#3B82F6';
+    } else {
+      ddayText = `D-${diff}`; ddayBg = 'var(--bg-inset)'; ddayFg = 'var(--t3)';
+    }
+
+    const memBadge = mem
+      ? `<span style="display:inline-flex;align-items:center;gap:.2rem;font-size:.5625rem;font-weight:700;padding:.1rem .4rem;border-radius:9999px;background:${mem.color}20;color:${mem.color};border:1px solid ${mem.color}40">
+           <span style="width:.4rem;height:.4rem;border-radius:50%;background:${mem.color};display:inline-block"></span>${mem.name}
+         </span>`
+      : members.length > 0 ? `<span style="font-size:.5625rem;color:var(--t5)">공동</span>` : '';
+
+    return `
+      <div id="planIncomeRow-${item.id}" class="divider-row" style="display:flex;align-items:center;gap:.625rem${isPast ? ';opacity:.5' : ''}">
+        <span style="font-size:.625rem;font-weight:700;padding:.25rem .5rem;border-radius:9999px;background:${ddayBg};color:${ddayFg};white-space:nowrap;flex-shrink:0;min-width:2.75rem;text-align:center">${ddayText}</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:.875rem;font-weight:700;color:var(--t1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${item.name}</div>
+          <div style="display:flex;align-items:center;gap:.375rem;margin-top:.125rem;flex-wrap:wrap">
+            <span style="font-size:.6875rem;color:var(--t5)">${item.date}</span>
+            ${memBadge}
+          </div>
+        </div>
+        <span class="num" style="font-size:.875rem;font-weight:800;color:var(--color-income);flex-shrink:0">+${fmtAmt(item.amount)}</span>
+        <button onclick="editPlannedIncome('${item.id}')" title="수정"
+          style="color:var(--t5);background:none;border:none;cursor:pointer;padding:.25rem;border-radius:.375rem;flex-shrink:0;display:flex;align-items:center;transition:color .15s"
+          onmouseover="this.style.color='var(--t1)'" onmouseout="this.style.color='var(--t5)'">
+          <i data-lucide="pencil" style="width:13px;height:13px"></i>
+        </button>
+        <button onclick="removePlannedIncome('${item.id}')" title="삭제"
+          style="color:var(--t5);background:none;border:none;cursor:pointer;padding:.25rem;border-radius:.375rem;flex-shrink:0;display:flex;align-items:center;transition:color .15s"
+          onmouseover="this.style.color='#EF4444'" onmouseout="this.style.color='var(--t5)'">
+          <i data-lucide="trash-2" style="width:13px;height:13px"></i>
+        </button>
+      </div>`;
+  }).join('');
+  refreshIcons();
+}
+
+window.addPlannedIncome = () => {
+  const name   = document.getElementById('planIncomeName').value.trim();
+  const amtRaw = document.getElementById('planIncomeAmount').value.trim();
+  const date   = document.getElementById('planIncomeDate').value.trim();
+  if (!name) { showToast('항목명을 입력해주세요.'); return; }
+  const amount = parseInt(amtRaw.replace(/[^0-9]/g, ''));
+  if (!amount || amount <= 0) { showToast('금액을 올바르게 입력해주세요.'); return; }
+  if (!date) { showToast('날짜를 선택해주세요.'); return; }
+  const memSel = document.getElementById('planIncomeMemberSel');
+  const memberId = memSel ? (memSel.value || null) : null;
+  const list = getPlannedIncome();
+  list.push({ id: genId(), name, amount, date, memberId });
+  savePlannedIncome(list);
+  document.getElementById('planIncomeName').value   = '';
+  document.getElementById('planIncomeAmount').value = '';
+  document.getElementById('planIncomeDate').value   = '';
+  document.getElementById('planIncomeDateDisp').textContent = '날짜 선택';
+  if (memSel) memSel.value = '';
+  renderPlannedIncome();
+  showToast(`${name} 추가됨 ✓`);
+};
+
+window.removePlannedIncome = (id) => {
+  const item = getPlannedIncome().find(i => i.id === id);
+  showConfirm(
+    `${item?.name || '항목'} 삭제`,
+    '이 예정 수입을 삭제하시겠습니까?',
+    () => { savePlannedIncome(getPlannedIncome().filter(i => i.id !== id)); renderPlannedIncome(); },
+    '삭제', '#EF4444'
+  );
+};
+
+window.editPlannedIncome = (id) => {
+  const members = getMembers();
+  const item = getPlannedIncome().find(i => i.id === id);
+  if (!item) return;
+  const row = document.getElementById(`planIncomeRow-${id}`);
+  if (!row) return;
+  row.style.alignItems = 'flex-start';
+  row.style.paddingTop = '.5rem';
+  row.style.paddingBottom = '.5rem';
+  row.style.opacity = '1';
+  const memOpts = members.length > 0
+    ? `<option value="">공동 (미지정)</option>` + members.map(m =>
+        `<option value="${m.id}"${m.id === item.memberId ? ' selected' : ''}>${m.name}</option>`
+      ).join('')
+    : '';
+  row.innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:.5rem;width:100%">
+      <div style="display:flex;gap:.5rem">
+        <input id="piN-${id}" class="app-input" value="${item.name.replace(/"/g,'&quot;')}"
+          style="flex:1;padding:.45rem .625rem;font-size:.8125rem" placeholder="항목명">
+        <input id="piA-${id}" class="app-input" value="${item.amount}"
+          style="width:7rem;padding:.45rem .625rem;font-size:.8125rem;text-align:right" placeholder="금액">
+      </div>
+      ${members.length > 0 ? `<select id="piM-${id}" class="app-input" style="padding:.45rem .625rem;font-size:.8125rem">${memOpts}</select>` : ''}
+      <div style="display:flex;gap:.375rem;align-items:center;flex-wrap:wrap">
+        <input type="hidden" id="piD-${id}" value="${item.date}">
+        <button onclick="openDatePicker('piD-${id}','piDDisp-${id}')"
+          style="flex:1;padding:.45rem .625rem;font-size:.8125rem;background:var(--bg-inset);border:1px solid var(--border);border-radius:.75rem;color:var(--t2);cursor:pointer;text-align:left">
+          <span id="piDDisp-${id}">${item.date}</span>
+        </button>
+        <button onclick="savePlannedIncomeEdit('${id}')" class="btn-sm">저장</button>
+        <button onclick="renderPlannedIncome()"
+          style="font-size:.75rem;font-weight:600;color:var(--t3);background:none;border:none;cursor:pointer;padding:.45rem .5rem;border-radius:.625rem;transition:background .15s"
+          onmouseover="this.style.background='var(--bg-raised)'" onmouseout="this.style.background='none'">취소</button>
+      </div>
+    </div>`;
+  document.getElementById(`piN-${id}`)?.focus();
+  refreshIcons();
+};
+
+window.savePlannedIncomeEdit = (id) => {
+  const name   = document.getElementById(`piN-${id}`)?.value.trim();
+  const amtRaw = document.getElementById(`piA-${id}`)?.value.trim();
+  const date   = document.getElementById(`piD-${id}`)?.value.trim();
+  const memEl  = document.getElementById(`piM-${id}`);
+  if (!name) { showToast('항목명을 입력해주세요.'); return; }
+  const amount = parseInt(amtRaw.replace(/[^0-9]/g, ''));
+  if (!amount || amount <= 0) { showToast('금액을 올바르게 입력해주세요.'); return; }
+  if (!date) { showToast('날짜를 선택해주세요.'); return; }
+  const memberId = memEl ? (memEl.value || null) : undefined;
+  savePlannedIncome(getPlannedIncome().map(i => i.id === id
+    ? { ...i, name, amount, date, ...(memberId !== undefined && { memberId }) }
+    : i));
+  renderPlannedIncome();
   showToast(`${name} 수정됨 ✓`);
 };
 

@@ -85,7 +85,7 @@
     <nav style="display:flex;gap:1.25rem;overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none" class="hide-scrollbar">
       <button class="tab-btn" data-tab="dashboard" onclick="switchTab('dashboard')">대시보드</button>
       <button class="tab-btn" data-tab="expense"   onclick="switchTab('expense')">지출 관리</button>
-      <button class="tab-btn" data-tab="income"    onclick="switchTab('income')">수입 설정</button>
+      <button class="tab-btn" data-tab="income"    onclick="switchTab('income')">수입 관리</button>
     </nav>
   </header>
 
@@ -398,47 +398,105 @@
 
 
   <!-- ══════════════════════════════════════════
-    탭 5: 수입 설정
+    탭: 수입 관리
   ══════════════════════════════════════════ -->
   <div id="tab-income" class="tab-content hidden">
-    <div style="display:flex;flex-direction:column;gap:.75rem">
 
-      <!-- 히어로: 월 예상 수입 + 수입 vs 고정지출 -->
-      <div class="card">
-        <p style="font-size:.6875rem;font-weight:600;color:var(--t4);letter-spacing:.04em;text-transform:uppercase;margin-bottom:.375rem">월 예상 수입</p>
-        <p id="incomeTotalAmt" class="num" style="font-size:2.25rem;font-weight:800;color:var(--color-income);line-height:1;letter-spacing:-.03em;margin-bottom:.875rem">0원</p>
-        <div id="incomeVsFixed">
-          <p style="font-size:.75rem;color:var(--t5);text-align:center;padding:.5rem 0">수입을 추가하면 분석이 표시됩니다</p>
-        </div>
-      </div>
-
-      <!-- 수입 항목 목록 + 추가 폼 -->
-      <div class="card">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.625rem">
-          <h2 style="font-size:.8125rem;font-weight:700;color:var(--t2)">수입 항목</h2>
-          <span id="incomeCount" style="font-size:.6875rem;color:var(--t4)">0건</span>
-        </div>
-        <div id="incomeList" style="margin-bottom:.625rem"></div>
-        <div class="or-divider" style="margin:.5rem 0">항목 추가</div>
-        <div style="display:flex;flex-direction:column;gap:.5rem">
-          <div style="display:flex;gap:.5rem">
-            <input id="incomeName" type="text" placeholder="항목명 (예: 월급)" class="app-input" style="flex:1;min-width:0"
-              onkeydown="if(event.key==='Enter')addIncome()">
-            <input id="incomeAmount" type="number" placeholder="금액" class="app-input" style="width:108px;flex-shrink:0"
-              onkeydown="if(event.key==='Enter')addIncome()">
-          </div>
-          <div style="display:flex;align-items:center;gap:.5rem">
-            <span style="font-size:.75rem;color:var(--t4);white-space:nowrap;flex-shrink:0">매월</span>
-            <input id="incomeDay" type="number" min="1" max="31" placeholder="25" class="app-input" style="width:72px;flex-shrink:0;text-align:center">
-            <span style="font-size:.75rem;color:var(--t4);white-space:nowrap;flex-shrink:0">일 입금</span>
-            <span style="font-size:.6875rem;color:var(--t5);flex:1">(선택)</span>
-            <button onclick="addIncome()" class="btn-sm">추가하기</button>
-          </div>
-        </div>
-      </div>
-
+    <!-- 수입 서브탭 바 -->
+    <div style="position:sticky;top:var(--header-h,88px);z-index:11;background:var(--bg-page);border-bottom:1px solid var(--divider);display:flex;padding:0 1.25rem;gap:1.25rem">
+      <button id="incSubBtn-fixed" class="income-sub-btn" onclick="switchIncomeTab('fixed')">고정수입</button>
+      <button id="incSubBtn-plan"  class="income-sub-btn" onclick="switchIncomeTab('plan')">예정수입</button>
     </div>
-    <div style="height:2rem"></div>
+
+    <!-- ── 고정수입 ── -->
+    <div id="income-fixed" class="income-sub-content">
+      <div style="display:flex;flex-direction:column;gap:.75rem;padding-top:.75rem">
+
+        <!-- 히어로: 월 예상 수입 + 수입 vs 고정지출 -->
+        <div class="card">
+          <p style="font-size:.6875rem;font-weight:600;color:var(--t4);letter-spacing:.04em;text-transform:uppercase;margin-bottom:.375rem">월 예상 수입 (고정)</p>
+          <p id="incomeTotalAmt" class="num" style="font-size:2.25rem;font-weight:800;color:var(--color-income);line-height:1;letter-spacing:-.03em;margin-bottom:.875rem">0원</p>
+          <div id="incomeVsFixed">
+            <p style="font-size:.75rem;color:var(--t5);text-align:center;padding:.5rem 0">수입을 추가하면 분석이 표시됩니다</p>
+          </div>
+        </div>
+
+        <!-- 고정수입 목록 + 추가 폼 -->
+        <div class="card">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.625rem">
+            <h2 style="font-size:.8125rem;font-weight:700;color:var(--t2)">고정수입 항목</h2>
+            <span id="incomeCount" style="font-size:.6875rem;color:var(--t4)">0건</span>
+          </div>
+          <div id="incomeList" style="margin-bottom:.625rem"></div>
+          <div class="or-divider" style="margin:.5rem 0">항목 추가</div>
+          <div style="display:flex;flex-direction:column;gap:.5rem">
+            <div style="display:flex;gap:.5rem">
+              <input id="incomeName" type="text" placeholder="항목명 (예: 월급)" class="app-input" style="flex:1;min-width:0"
+                onkeydown="if(event.key==='Enter')addFixedIncome()">
+              <input id="incomeAmount" type="number" placeholder="금액" class="app-input" style="width:108px;flex-shrink:0"
+                onkeydown="if(event.key==='Enter')addFixedIncome()">
+            </div>
+            <!-- 멤버 태그 -->
+            <div id="incomeMemberSelRow" style="display:none">
+              <select id="incomeMemberSel" class="app-input" style="width:100%;font-size:.8125rem"></select>
+            </div>
+            <div style="display:flex;align-items:center;gap:.5rem">
+              <span style="font-size:.75rem;color:var(--t4);white-space:nowrap;flex-shrink:0">매월</span>
+              <input id="incomeDay" type="number" min="1" max="31" placeholder="25" class="app-input" style="width:72px;flex-shrink:0;text-align:center">
+              <span style="font-size:.75rem;color:var(--t4);white-space:nowrap;flex-shrink:0">일 입금</span>
+              <span style="font-size:.6875rem;color:var(--t5);flex:1">(선택)</span>
+              <button onclick="addFixedIncome()" class="btn-sm">추가하기</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+      <div style="height:2rem"></div>
+    </div><!-- /income-fixed -->
+
+    <!-- ── 예정수입 ── -->
+    <div id="income-plan" class="income-sub-content hidden">
+      <div style="display:flex;flex-direction:column;gap:.75rem;padding-top:.75rem">
+
+        <!-- 히어로: 이번 달 예정 수입 -->
+        <div class="card">
+          <p style="font-size:.6875rem;font-weight:600;color:var(--t4);letter-spacing:.04em;text-transform:uppercase;margin-bottom:.375rem">이번 달 예정 수입</p>
+          <p id="planIncomeHeroAmt" class="num" style="font-size:2.25rem;font-weight:800;color:var(--color-income);line-height:1;letter-spacing:-.03em;margin-bottom:.375rem">0원</p>
+          <p id="planIncomeHeroSub" style="font-size:.75rem;color:var(--t4)">이번 달 남은 예정 수입 없음</p>
+        </div>
+
+        <!-- 예정수입 목록 + 추가 폼 -->
+        <div class="card">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.625rem">
+            <h2 style="font-size:.8125rem;font-weight:700;color:var(--t2)">예정수입 목록</h2>
+            <span id="planIncomeCount" style="font-size:.6875rem;color:var(--t4)">0건</span>
+          </div>
+          <div id="planIncomeList" style="margin-bottom:.625rem"></div>
+          <div class="or-divider" style="margin:.5rem 0">예정수입 추가</div>
+          <div style="display:flex;flex-direction:column;gap:.5rem">
+            <div style="display:flex;gap:.5rem">
+              <input id="planIncomeName" type="text" placeholder="항목명 (예: 용돈, 부수입)" class="app-input" style="flex:1;min-width:0">
+              <input id="planIncomeAmount" type="number" placeholder="금액" class="app-input" style="width:108px;flex-shrink:0">
+            </div>
+            <!-- 날짜 선택 -->
+            <input type="hidden" id="planIncomeDate">
+            <button onclick="openDatePicker('planIncomeDate','planIncomeDateDisp')"
+              style="width:100%;padding:.5rem .75rem;background:var(--bg-inset);border:1px solid var(--border);border-radius:.75rem;font-size:.8125rem;color:var(--t3);cursor:pointer;text-align:left;display:flex;align-items:center;gap:.5rem">
+              <i data-lucide="calendar" style="width:14px;height:14px;flex-shrink:0"></i>
+              <span id="planIncomeDateDisp">날짜 선택</span>
+            </button>
+            <!-- 멤버 태그 -->
+            <div id="planIncomeMemberSelRow" style="display:none">
+              <select id="planIncomeMemberSel" class="app-input" style="width:100%;font-size:.8125rem"></select>
+            </div>
+            <button onclick="addPlannedIncome()" class="btn-primary">추가하기</button>
+          </div>
+        </div>
+
+      </div>
+      <div style="height:2rem"></div>
+    </div><!-- /income-plan -->
+
   </div><!-- /tab-income -->
 
 
