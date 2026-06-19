@@ -303,6 +303,10 @@
               <input id="planAmount" type="number" placeholder="금액" class="app-input" style="width:108px;flex-shrink:0"
                 onkeydown="if(event.key==='Enter')addPlanned()">
             </div>
+            <!-- 멤버 선택 (멤버 설정 시 표시) -->
+            <div id="planMemberSelRow" style="display:none">
+              <select id="planMemberSel" class="app-input" style="width:100%"></select>
+            </div>
             <div style="display:flex;gap:.5rem;flex-wrap:wrap">
               <input id="planDate" type="hidden">
               <button type="button" onclick="openDatePicker('planDate','planDateLabel')" class="app-input" style="flex:1;min-width:130px;display:flex;align-items:center;gap:.375rem;cursor:pointer">

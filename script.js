@@ -808,7 +808,7 @@ function renderDashboard() {
   if (state.rightTab === 'calendar') {
     const listCountEl = document.getElementById('listCount');
     if (listCountEl) listCountEl.textContent = `${merged.length}건`;
-    renderCalendar(txs);
+    renderCalendar(merged);
   } else {
     renderDetailTabs(merged);
     renderTxList(merged);
@@ -853,7 +853,7 @@ function getMergedExpenses() {
       category: p.category || '기타',
       date: p.date,
       isCancelled: false,
-      memberId: null,
+      memberId: p.memberId || null,
       _type: 'plan',
     }));
 
@@ -1671,6 +1671,20 @@ function renderPlanned() {
     ).join('');
   }
 
+  // 멤버 선택 셀렉트 (멤버 있을 때만)
+  const members = getMembers();
+  const memRow  = document.getElementById('planMemberSelRow');
+  const memSel  = document.getElementById('planMemberSel');
+  if (memRow && memSel) {
+    if (members.length > 0) {
+      memRow.style.display = 'block';
+      memSel.innerHTML = `<option value="">공동 (미지정)</option>`
+        + members.map(m => `<option value="${m.id}">${m.name}</option>`).join('');
+    } else {
+      memRow.style.display = 'none';
+    }
+  }
+
   const container = document.getElementById('planList');
   if (!container) return;
 
@@ -1680,11 +1694,15 @@ function renderPlanned() {
     return;
   }
 
+  const members = getMembers();
+  const memberMap = Object.fromEntries(members.map(m => [m.id, m]));
+
   container.innerHTML = sorted.map(item => {
     const diff   = dday(item.date);
     const isPast = diff < 0;
     const isToday = diff === 0;
     const catInfo = getAllCategories()[item.category] || { color: '#94A3B8' };
+    const mem = item.memberId ? memberMap[item.memberId] : null;
 
     let ddayText, ddayBg, ddayFg;
     if (isToday) {
@@ -1697,14 +1715,23 @@ function renderPlanned() {
       ddayText = `D-${diff}`; ddayBg = 'var(--bg-inset)'; ddayFg = 'var(--t3)';
     }
 
+    const memBadge = mem
+      ? `<span style="display:inline-flex;align-items:center;gap:.2rem;font-size:.5625rem;font-weight:700;padding:.1rem .4rem;border-radius:9999px;background:${mem.color}20;color:${mem.color};border:1px solid ${mem.color}40">
+           <span style="width:.4rem;height:.4rem;border-radius:50%;background:${mem.color};display:inline-block"></span>${mem.name}
+         </span>`
+      : members.length > 0
+        ? `<span style="font-size:.5625rem;color:var(--t5)">공동</span>`
+        : '';
+
     return `
     <div id="planRow-${item.id}" class="divider-row" style="display:flex;align-items:center;gap:.625rem${isPast ? ';opacity:.45' : ''}">
       <span style="font-size:.625rem;font-weight:700;padding:.25rem .5rem;border-radius:9999px;background:${ddayBg};color:${ddayFg};white-space:nowrap;flex-shrink:0;min-width:2.75rem;text-align:center">${ddayText}</span>
       <div style="flex:1;min-width:0">
         <div style="font-size:.875rem;font-weight:700;color:var(--t1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${item.name}</div>
-        <div style="display:flex;align-items:center;gap:.375rem;margin-top:.125rem">
+        <div style="display:flex;align-items:center;gap:.375rem;margin-top:.125rem;flex-wrap:wrap">
           <span style="font-size:.6875rem;font-weight:600;color:${catInfo.color}">${item.category}</span>
           <span style="font-size:.6875rem;color:var(--t5)">${item.date}</span>
+          ${memBadge}
         </div>
       </div>
       <span class="num" style="font-size:.875rem;font-weight:800;color:var(--color-expense);flex-shrink:0">${fmtAmt(item.amount)}</span>
@@ -1803,12 +1830,14 @@ window.addPlanned = () => {
   const amtRaw = document.getElementById('planAmount').value.trim();
   const date   = document.getElementById('planDate').value;
   const cat    = document.getElementById('planCategory').value;
+  const memSel = document.getElementById('planMemberSel');
+  const memberId = memSel ? (memSel.value || null) : null;
   if (!name) { showToast('항목명을 입력해주세요.'); return; }
   if (!date) { showToast('날짜를 선택해주세요.'); return; }
   const amount = parseInt(amtRaw.replace(/[^0-9]/g, ''));
   if (!amount || amount <= 0) { showToast('금액을 올바르게 입력해주세요.'); return; }
   const list = getPlanned();
-  list.push({ id: genId(), name, amount, date, category: cat });
+  list.push({ id: genId(), name, amount, date, category: cat, memberId });
   savePlanned(list);
   document.getElementById('planName').value   = '';
   document.getElementById('planAmount').value = '';
@@ -1841,6 +1870,12 @@ window.editPlanned = (id) => {
   const catOpts = Object.keys(getAllCategories()).map(c =>
     `<option value="${c}"${c === item.category ? ' selected' : ''}>${c}</option>`
   ).join('');
+  const members = getMembers();
+  const memOpts = members.length > 0
+    ? `<option value="">공동</option>` + members.map(m =>
+        `<option value="${m.id}"${m.id === item.memberId ? ' selected' : ''}>${m.name}</option>`
+      ).join('')
+    : '';
   row.innerHTML = `
     <div style="display:flex;flex-direction:column;gap:.5rem;width:100%">
       <div style="display:flex;gap:.5rem">
@@ -1849,6 +1884,7 @@ window.editPlanned = (id) => {
         <input id="ppA-${id}" class="app-input" value="${item.amount}"
           style="width:7rem;padding:.45rem .625rem;font-size:.8125rem;text-align:right" placeholder="금액">
       </div>
+      ${members.length > 0 ? `<select id="ppM-${id}" class="app-input" style="padding:.45rem .625rem;font-size:.8125rem">${memOpts}</select>` : ''}
       <div style="display:flex;gap:.375rem;align-items:center;flex-wrap:wrap">
         <input id="ppD-${id}" type="hidden" value="${item.date}">
         <button type="button" onclick="openDatePicker('ppD-${id}','ppDLabel-${id}')" class="app-input"
@@ -1871,11 +1907,15 @@ window.savePlannedEdit = (id) => {
   const amtRaw = document.getElementById(`ppA-${id}`)?.value.trim();
   const date   = document.getElementById(`ppD-${id}`)?.value;
   const cat    = document.getElementById(`ppC-${id}`)?.value;
+  const memEl  = document.getElementById(`ppM-${id}`);
+  const memberId = memEl ? (memEl.value || null) : undefined;
   if (!name) { showToast('항목명을 입력해주세요.'); return; }
   if (!date) { showToast('날짜를 선택해주세요.'); return; }
   const amount = parseInt(amtRaw.replace(/[^0-9]/g, ''));
   if (!amount || amount <= 0) { showToast('금액을 올바르게 입력해주세요.'); return; }
-  savePlanned(getPlanned().map(i => i.id === id ? { ...i, name, amount, date, category: cat } : i));
+  savePlanned(getPlanned().map(i => i.id === id
+    ? { ...i, name, amount, date, category: cat, ...(memberId !== undefined && { memberId }) }
+    : i));
   renderPlanned();
   showToast(`${name} 수정됨 ✓`);
 };
@@ -1915,24 +1955,24 @@ function shortFmt(amt) {
   return String(amt);
 }
 
-function renderCalendar(txs) {
+function renderCalendar(mergedItems) {
   const grid = document.getElementById('calendarGrid');
   if (!grid) return;
 
-  const active = (txs || []).filter(t => !t.isCancelled);
+  const items = (mergedItems || getMergedExpenses()).filter(t => !t.isCancelled);
   const [year, month] = state.ym.split('-').map(Number);
   const firstDay    = new Date(year, month - 1, 1).getDay();
   const daysInMonth = new Date(year, month, 0).getDate();
 
-  // 날짜별 지출 합계 + 내역 목록
-  const dayTotals = {};
-  const dayTxMap  = {};
-  for (const tx of active) {
-    const d = parseInt(tx.date.split('-')[2]);
-    if (isNaN(d)) continue;
-    dayTotals[d] = (dayTotals[d] || 0) + tx.amount;
-    if (!dayTxMap[d]) dayTxMap[d] = [];
-    dayTxMap[d].push(tx);
+  // 날짜별 합계 + 항목 목록 (카드/예정은 실제 날짜, 고정은 1일)
+  const dayTotals  = {};
+  const dayItemMap = {};
+  for (const item of items) {
+    const d = parseInt((item.date || '').split('-')[2]);
+    if (isNaN(d) || d < 1 || d > 31) continue;
+    dayTotals[d] = (dayTotals[d] || 0) + item.amount;
+    if (!dayItemMap[d]) dayItemMap[d] = [];
+    dayItemMap[d].push(item);
   }
   const maxAmt = Math.max(...Object.values(dayTotals), 1);
 
@@ -1940,6 +1980,7 @@ function renderCalendar(txs) {
   const today  = new Date();
   const isThisMonth = `${today.getFullYear()}-${pad(today.getMonth()+1)}` === state.ym;
   const todayD = today.getDate();
+  const allCats = getAllCategories();
 
   const WDAYS = ['일','월','화','수','목','금','토'];
 
@@ -1961,22 +2002,30 @@ function renderCalendar(txs) {
     const isToday = isThisMonth && d === todayD;
     const isSel   = state.calDay === d;
     const hasTx   = amt > 0;
+    const dayItems = dayItemMap[d] || [];
+
+    // 타입별 dot indicator
+    const hasFixed = dayItems.some(i => i._type === 'fixed');
+    const hasPlan  = dayItems.some(i => i._type === 'plan');
+    const hasCard  = dayItems.some(i => i._type === 'card');
+    const dots = (hasFixed || hasPlan || hasCard) && !hasTx ? '' :
+      [hasFixed ? '#8B5CF6' : null, hasPlan ? '#F59E0B' : null]
+        .filter(Boolean)
+        .map(c => `<span style="width:.3rem;height:.3rem;border-radius:50%;background:${c};display:inline-block;margin-right:1px"></span>`)
+        .join('');
 
     let bg, numCol, amtCol;
     if (!hasTx) {
       bg = 'var(--bg-inset)'; numCol = 'var(--t5)'; amtCol = 'var(--t5)';
     } else if (ratio < 0.35) {
       bg = isDark ? 'rgba(99,102,241,.18)' : '#EEF2FF';
-      numCol = isDark ? '#A5B4FC' : '#4338CA';
-      amtCol = isDark ? '#818CF8' : '#4338CA';
+      numCol = isDark ? '#A5B4FC' : '#4338CA'; amtCol = numCol;
     } else if (ratio < 0.7) {
       bg = isDark ? 'rgba(99,102,241,.4)' : '#C7D2FE';
-      numCol = isDark ? '#E0E7FF' : '#3730A3';
-      amtCol = isDark ? '#A5B4FC' : '#3730A3';
+      numCol = isDark ? '#E0E7FF' : '#3730A3'; amtCol = numCol;
     } else {
       bg = isDark ? '#4338CA' : '#4F46E5';
-      numCol = '#FFFFFF';
-      amtCol = '#C7D2FE';
+      numCol = '#FFFFFF'; amtCol = '#C7D2FE';
     }
 
     const todayRing = isToday ? 'outline:2px solid #6366F1;outline-offset:-2px;' : '';
@@ -1987,31 +2036,43 @@ function renderCalendar(txs) {
            style="background:${bg};border-radius:6px;padding:3px 4px;min-height:46px;cursor:pointer;${todayRing}${selRing}transition:filter .1s"
            onmouseover="this.style.filter='brightness(.92)'" onmouseout="this.style.filter=''">
         <div style="font-size:.625rem;font-weight:${isToday?'800':'600'};color:${numCol}">${d}</div>
-        ${hasTx ? `<div class="num" style="font-size:.5625rem;font-weight:700;color:${amtCol};margin-top:2px;line-height:1.3">${shortFmt(amt)}</div>` : ''}
+        ${hasTx ? `<div class="num" style="font-size:.5rem;font-weight:700;color:${amtCol};margin-top:2px;line-height:1.3">${shortFmt(amt)}</div>` : ''}
+        ${dots ? `<div style="margin-top:3px">${dots}</div>` : ''}
       </div>`;
   }
   html += '</div>';
 
   // 선택된 날짜 상세
   if (state.calDay) {
-    const dateStr = `${state.ym}-${pad(state.calDay)}`;
-    const dayTxs  = (dayTxMap[state.calDay] || []).sort((a,b) => a.merchant.localeCompare(b.merchant));
-    const dayTotal = dayTxs.reduce((s,t) => s + t.amount, 0);
+    const dayItems2 = (dayItemMap[state.calDay] || []).slice().sort((a, b) => {
+      const order = { card: 0, plan: 1, fixed: 2 };
+      return (order[a._type]||0) - (order[b._type]||0);
+    });
+    const dayTotal = dayItems2.reduce((s, i) => s + i.amount, 0);
+
+    const typeBadge = type => {
+      if (type === 'fixed') return `<span style="font-size:.5rem;font-weight:800;padding:.1rem .35rem;border-radius:9999px;background:#8B5CF615;color:#8B5CF6">고정</span>`;
+      if (type === 'plan')  return `<span style="font-size:.5rem;font-weight:800;padding:.1rem .35rem;border-radius:9999px;background:#F59E0B15;color:#D97706">예정</span>`;
+      return '';
+    };
+
     html += `
       <div style="border-top:1px solid var(--divider);padding-top:.75rem;margin-top:.625rem">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem">
           <span style="font-size:.8125rem;font-weight:700;color:var(--t2)">${month}월 ${state.calDay}일</span>
           <span class="num" style="font-size:.8125rem;font-weight:800;color:var(--t1)">${fmtAmt(dayTotal)}</span>
         </div>
-        ${dayTxs.length === 0
+        ${dayItems2.length === 0
           ? `<p style="font-size:.75rem;color:var(--t5);text-align:center;padding:.75rem 0">내역 없음</p>`
-          : dayTxs.map(tx => `
-              <div class="divider-row" style="display:flex;justify-content:space-between;align-items:center">
-                <div>
-                  <div style="font-size:.8125rem;font-weight:600;color:var(--t2)">${tx.merchant}</div>
-                  <div style="font-size:.625rem;font-weight:600;color:${CATEGORIES[tx.category]?.color||'var(--t4)'}">${tx.category}</div>
+          : dayItems2.map(item => `
+              <div class="divider-row" style="display:flex;justify-content:space-between;align-items:center;gap:.5rem">
+                <div style="flex:1;min-width:0">
+                  <div style="display:flex;align-items:center;gap:.375rem;font-size:.8125rem;font-weight:600;color:var(--t2)">
+                    ${item.merchant} ${typeBadge(item._type)}
+                  </div>
+                  <div style="font-size:.625rem;font-weight:600;color:${allCats[item.category]?.color||'var(--t4)'};margin-top:.1rem">${item.category}</div>
                 </div>
-                <div class="num" style="font-size:.8125rem;font-weight:700;color:var(--t1)">${fmtAmt(tx.amount)}</div>
+                <div class="num" style="font-size:.8125rem;font-weight:700;color:var(--t1);flex-shrink:0">${fmtAmt(item.amount)}</div>
               </div>`).join('')
         }
       </div>`;
@@ -2372,10 +2433,9 @@ window.switchTab       = switchTab;
 window.switchExpenseTab = switchExpenseTab;
 window.switchDetailTab = switchDetailTab;
 window.switchRightTab  = switchRightTab;
-window.selectCalDay    = (d) => {
+window.selectCalDay = (d) => {
   state.calDay = state.calDay === d ? null : d;
-  const all = JSON.parse(localStorage.getItem(SK.TX) || '{}');
-  renderCalendar(all[state.ym] || []);
+  renderCalendar(getMergedExpenses());
 };
 
 window.handleFileSelect = (e) => { const f = e.target.files[0]; if (f) readFile(f); };
