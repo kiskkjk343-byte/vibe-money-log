@@ -1953,7 +1953,11 @@ window.openMemberModal = () => {
   renderMemberModalList();
   document.getElementById('memberModal').classList.remove('hidden');
 };
-window.closeMemberModal = () => document.getElementById('memberModal').classList.add('hidden');
+window.closeMemberModal = () => {
+  document.getElementById('memberModal').classList.add('hidden');
+  renderFixed();
+  if (state.tab === 'dashboard') renderDashboard();
+};
 window.addMember = () => {
   const name = document.getElementById('newMemberName').value.trim();
   if (!name) { showToast('이름을 입력해주세요.'); return; }
@@ -1964,6 +1968,7 @@ window.addMember = () => {
   saveMembers(members);
   document.getElementById('newMemberName').value = '';
   renderMemberModalList();
+  renderFixed();
   showToast(`${name} 추가됨 ✓`);
 };
 window.removeMember = (id) => {
