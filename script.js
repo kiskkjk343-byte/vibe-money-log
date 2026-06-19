@@ -994,7 +994,14 @@ function renderFixed() {
   const filterEl = document.getElementById('fixedMemberFilter');
   if (filterEl) {
     if (!hasMem) {
-      filterEl.style.display = 'none';
+      filterEl.style.display = 'flex';
+      filterEl.innerHTML = `
+        <button onclick="openMemberModal()"
+          style="display:flex;align-items:center;gap:.375rem;font-size:.75rem;font-weight:600;color:#6366F1;background:#6366F115;border:1px dashed #6366F155;border-radius:9999px;padding:.3rem .875rem;cursor:pointer;transition:all .15s"
+          onmouseover="this.style.background='#6366F125'" onmouseout="this.style.background='#6366F115'">
+          <i data-lucide="user-plus" style="width:13px;height:13px"></i>멤버 추가하면 가족별 필터 사용 가능
+        </button>`;
+      refreshIcons();
     } else {
       filterEl.style.display = 'flex';
       const pills = [
@@ -1009,6 +1016,11 @@ function renderFixed() {
           ${p.label}
         </button>`;
       }).join('');
+      filterEl.innerHTML += `<button onclick="openMemberModal()" title="멤버 관리"
+        style="display:flex;align-items:center;gap:.25rem;font-size:.6875rem;font-weight:600;color:var(--t4);background:none;border:none;cursor:pointer;padding:.3rem .5rem;border-radius:9999px;transition:color .15s"
+        onmouseover="this.style.color='var(--t2)'" onmouseout="this.style.color='var(--t4)'">
+        <i data-lucide="users" style="width:12px;height:12px"></i>
+      </button>`;
     }
   }
 
