@@ -65,6 +65,7 @@ const state = {
   calDay: null,
   activeMember: 'all',
   inputMember:  null,
+  fixedMember:  'all',
 };
 
 /* ── 유틸리티 ── */
@@ -984,11 +985,44 @@ function closeModal() { document.getElementById('categoryModal').classList.add('
 const fixedGroupState = {};
 
 function renderFixed() {
-  const list    = getFixed();
-  const total   = list.reduce((s, i) => s + i.amount, 0);
+  const allList = getFixed();
+  const members = getMembers();
+  const hasMem  = members.length > 0;
   const allCats = getAllCategories();
 
-  // 카테고리 셀렉트
+  // ── 멤버 필터 필 ──
+  const filterEl = document.getElementById('fixedMemberFilter');
+  if (filterEl) {
+    if (!hasMem) {
+      filterEl.style.display = 'none';
+    } else {
+      filterEl.style.display = 'flex';
+      const pills = [
+        { id: 'all',    label: '전체', color: '#6366F1' },
+        ...members.map(m => ({ id: m.id, label: m.name, color: m.color })),
+        { id: 'shared', label: '공동', color: '#94A3B8' },
+      ];
+      filterEl.innerHTML = pills.map(p => {
+        const active = state.fixedMember === p.id;
+        return `<button onclick="switchFixedMember('${p.id}')"
+          style="font-size:.75rem;font-weight:${active ? 700 : 600};padding:.3rem .75rem;border-radius:9999px;border:${active ? 'none' : '1px solid var(--border)'};background:${active ? p.color : 'var(--bg-inset)'};color:${active ? '#fff' : 'var(--t3)'};cursor:pointer;transition:all .15s;flex-shrink:0">
+          ${p.label}
+        </button>`;
+      }).join('');
+    }
+  }
+
+  // ── 추가폼 멤버 셀렉트 ──
+  const memRow = document.getElementById('fixedMemberSelRow');
+  const memSel = document.getElementById('fixedMemberSel');
+  if (memRow) memRow.style.display = hasMem ? '' : 'none';
+  if (memSel && hasMem) {
+    const cur = memSel.value;
+    memSel.innerHTML = `<option value="">공동</option>` +
+      members.map(m => `<option value="${m.id}"${m.id === cur ? ' selected' : ''}>${m.name}</option>`).join('');
+  }
+
+  // ── 카테고리 셀렉트 ──
   const sel = document.getElementById('fixedCategory');
   if (sel) {
     const cur = sel.value;
@@ -997,17 +1031,57 @@ function renderFixed() {
     ).join('');
   }
 
-  // 히어로 총액
+  // ── 멤버 필터 적용 ──
+  let list = allList;
+  if (hasMem && state.fixedMember !== 'all') {
+    list = state.fixedMember === 'shared'
+      ? allList.filter(i => !i.member)
+      : allList.filter(i => i.member === state.fixedMember);
+  }
+
+  const total = list.reduce((s, i) => s + i.amount, 0);
+
+  // ── 히어로 총액 ──
   const totalEl = document.getElementById('fixedTotalAmt');
   if (totalEl) totalEl.textContent = fmtAmt(total);
   const countEl = document.getElementById('fixedCount');
   if (countEl) countEl.textContent = `${list.length}건`;
 
-  // 카테고리 비중 바
+  // ── 멤버별 합계 (전체 보기일 때만) ──
+  const memberBdEl = document.getElementById('fixedMemberBreakdown');
+  if (memberBdEl) {
+    if (hasMem && state.fixedMember === 'all' && allList.length > 0) {
+      const memTotals = {};
+      members.forEach(m => { memTotals[m.id] = 0; });
+      let sharedTotal = 0;
+      for (const item of allList) {
+        if (item.member && memTotals[item.member] !== undefined) memTotals[item.member] += item.amount;
+        else sharedTotal += item.amount;
+      }
+      const rows = [
+        ...members.map(m => ({ label: m.name, color: m.color, amt: memTotals[m.id] })),
+        { label: '공동', color: '#94A3B8', amt: sharedTotal },
+      ].filter(r => r.amt > 0);
+      memberBdEl.innerHTML = rows.length > 0 ? `
+        <div style="display:flex;gap:.75rem;flex-wrap:wrap;margin-bottom:.75rem;padding-top:.125rem">
+          ${rows.map(r => `
+            <div style="display:flex;align-items:center;gap:.375rem">
+              <span style="width:.375rem;height:.375rem;border-radius:50%;background:${r.color};flex-shrink:0"></span>
+              <span style="font-size:.6875rem;color:var(--t3)">${r.label}</span>
+              <span class="num" style="font-size:.6875rem;font-weight:700;color:var(--t2)">${fmtAmt(r.amt)}</span>
+            </div>`).join('')}
+        </div>` : '';
+    } else {
+      memberBdEl.innerHTML = '';
+    }
+  }
+
+  // ── 카테고리 비중 바 ──
   const bdEl = document.getElementById('fixedBreakdown');
   if (bdEl) {
     if (list.length === 0) {
-      bdEl.innerHTML = `<p style="font-size:.75rem;color:var(--t5);text-align:center;padding:.5rem 0">항목을 추가하면 비중이 표시됩니다</p>`;
+      bdEl.innerHTML = `<p style="font-size:.75rem;color:var(--t5);text-align:center;padding:.5rem 0">
+        ${hasMem && state.fixedMember !== 'all' ? '이 멤버의 항목이 없습니다' : '항목을 추가하면 비중이 표시됩니다'}</p>`;
     } else {
       const byCat = {};
       for (const item of list) byCat[item.category] = (byCat[item.category] || 0) + item.amount;
@@ -1035,17 +1109,17 @@ function renderFixed() {
     }
   }
 
-  // 항목 목록 — 카테고리별 아코디언
+  // ── 항목 목록 — 카테고리별 아코디언 ──
   const container = document.getElementById('fixedList');
   if (!container) { refreshIcons(); return; }
 
   if (list.length === 0) {
-    container.innerHTML = `<p style="font-size:.8125rem;color:var(--t5);text-align:center;padding:.75rem 0">아직 등록된 항목이 없습니다</p>`;
+    container.innerHTML = `<p style="font-size:.8125rem;color:var(--t5);text-align:center;padding:.75rem 0">
+      ${hasMem && state.fixedMember !== 'all' ? '이 멤버의 항목이 없습니다' : '아직 등록된 항목이 없습니다'}</p>`;
     refreshIcons();
     return;
   }
 
-  // 카테고리별 그룹화
   const grouped = {};
   for (const item of list) {
     if (!grouped[item.category]) grouped[item.category] = [];
@@ -1059,10 +1133,15 @@ function renderFixed() {
 
     const itemsHtml = items.map(item => {
       const pct = total > 0 ? Math.round(item.amount / total * 100) : 0;
+      const mem = members.find(m => m.id === item.member);
+      const memBadge = !hasMem ? '' : mem
+        ? `<span style="font-size:.5625rem;font-weight:700;color:${mem.color};background:${mem.color}22;padding:.125rem .4rem;border-radius:9999px;flex-shrink:0;white-space:nowrap">${mem.name}</span>`
+        : `<span style="font-size:.5625rem;font-weight:600;color:var(--t5);background:var(--bg-inset);padding:.125rem .4rem;border-radius:9999px;flex-shrink:0">공동</span>`;
       return `
-        <div id="fixedRow-${item.id}" class="divider-row" style="display:flex;align-items:center;gap:.625rem;padding:.5rem .875rem">
-          <div style="flex:1;min-width:0">
-            <div style="font-size:.875rem;font-weight:700;color:var(--t1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${item.name}</div>
+        <div id="fixedRow-${item.id}" class="divider-row" style="display:flex;align-items:center;gap:.5rem;padding:.5rem .875rem">
+          <div style="flex:1;min-width:0;display:flex;align-items:center;gap:.4rem;overflow:hidden">
+            <span style="font-size:.875rem;font-weight:700;color:var(--t1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${item.name}</span>
+            ${memBadge}
           </div>
           <span class="num" style="font-size:.875rem;font-weight:800;color:var(--t1);flex-shrink:0">${fmtAmt(item.amount)}</span>
           <span class="num" style="font-size:.625rem;color:var(--t5);min-width:1.75rem;text-align:right">${pct}%</span>
@@ -1104,15 +1183,22 @@ window.toggleFixedGroup = (cat) => {
   renderFixed();
 };
 
+window.switchFixedMember = (id) => {
+  state.fixedMember = id;
+  renderFixed();
+};
+
 window.addFixed = () => {
   const name   = document.getElementById('fixedName').value.trim();
   const amtRaw = document.getElementById('fixedAmount').value.trim();
   const cat    = document.getElementById('fixedCategory').value;
+  const memSel = document.getElementById('fixedMemberSel');
+  const member = memSel ? (memSel.value || null) : null;
   if (!name) { showToast('항목명을 입력해주세요.'); return; }
   const amount = parseInt(amtRaw.replace(/[^0-9]/g, ''));
   if (!amount || amount <= 0) { showToast('금액을 올바르게 입력해주세요.'); return; }
   const list = getFixed();
-  list.push({ id: genId(), name, amount, category: cat });
+  list.push({ id: genId(), name, amount, category: cat, member });
   saveFixed(list);
   document.getElementById('fixedName').value   = '';
   document.getElementById('fixedAmount').value = '';
@@ -1135,6 +1221,12 @@ window.editFixed = (id) => {
   if (!item) return;
   const row = document.getElementById(`fixedRow-${id}`);
   if (!row) return;
+  const members = getMembers();
+  const memOpts = members.length > 0
+    ? `<select id="feM-${id}" class="app-input" style="flex:1;max-width:7rem;padding:.45rem .625rem;font-size:.8125rem">
+        <option value="">공동</option>
+        ${members.map(m => `<option value="${m.id}"${m.id === item.member ? ' selected' : ''}>${m.name}</option>`).join('')}
+       </select>` : '';
   row.style.alignItems = 'flex-start';
   row.style.paddingTop = '.5rem';
   row.style.paddingBottom = '.5rem';
@@ -1146,10 +1238,11 @@ window.editFixed = (id) => {
         <input id="feA-${id}" class="app-input" value="${item.amount}"
           style="width:7rem;padding:.45rem .625rem;font-size:.8125rem;text-align:right" placeholder="금액">
       </div>
-      <div style="display:flex;gap:.375rem;align-items:center">
+      <div style="display:flex;gap:.375rem;align-items:center;flex-wrap:wrap">
         <select id="feC-${id}" class="app-input" style="flex:1;padding:.45rem .625rem;font-size:.8125rem">
           ${Object.keys(getAllCategories()).map(c => `<option value="${c}"${c === item.category ? ' selected' : ''}>${c}</option>`).join('')}
         </select>
+        ${memOpts}
         <button onclick="saveFixedEdit('${id}')" class="btn-sm">저장</button>
         <button onclick="renderFixed()"
           style="font-size:.75rem;font-weight:600;color:var(--t3);background:none;border:none;cursor:pointer;padding:.45rem .5rem;border-radius:.625rem;transition:background .15s"
@@ -1163,10 +1256,16 @@ window.saveFixedEdit = (id) => {
   const name   = document.getElementById(`feN-${id}`)?.value.trim();
   const amtRaw = document.getElementById(`feA-${id}`)?.value.trim();
   const cat    = document.getElementById(`feC-${id}`)?.value;
+  const memEl  = document.getElementById(`feM-${id}`);
   if (!name) { showToast('항목명을 입력해주세요.'); return; }
   const amount = parseInt(amtRaw.replace(/[^0-9]/g, ''));
   if (!amount || amount <= 0) { showToast('금액을 올바르게 입력해주세요.'); return; }
-  saveFixed(getFixed().map(i => i.id === id ? { ...i, name, amount, category: cat } : i));
+  saveFixed(getFixed().map(i => {
+    if (i.id !== id) return i;
+    const updated = { ...i, name, amount, category: cat };
+    if (memEl) updated.member = memEl.value || null;
+    return updated;
+  }));
   renderFixed();
   showToast(`${name} 수정됨 ✓`);
 };

@@ -285,18 +285,21 @@
       <!-- 히어로: 월 예상 고정지출 + 카테고리 비중 -->
       <div class="card">
         <p style="font-size:.6875rem;font-weight:600;color:var(--t4);letter-spacing:.04em;text-transform:uppercase;margin-bottom:.375rem">월 예상 고정지출</p>
-        <p id="fixedTotalAmt" class="num" style="font-size:2.25rem;font-weight:800;color:var(--color-expense);line-height:1;letter-spacing:-.03em;margin-bottom:.875rem">0원</p>
-        <div id="fixedBreakdown">
+        <p id="fixedTotalAmt" class="num" style="font-size:2.25rem;font-weight:800;color:var(--color-expense);line-height:1;letter-spacing:-.03em;margin-bottom:.375rem">0원</p>
+        <div id="fixedMemberBreakdown"></div>
+        <div id="fixedBreakdown" style="margin-top:.375rem">
           <p style="font-size:.75rem;color:var(--t5);text-align:center;padding:.5rem 0">항목을 추가하면 비중이 표시됩니다</p>
         </div>
       </div>
 
       <!-- 항목 목록 + 추가 폼 -->
       <div class="card">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.625rem">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.375rem">
           <h2 style="font-size:.8125rem;font-weight:700;color:var(--t2)">고정 지출 항목</h2>
           <span id="fixedCount" style="font-size:.6875rem;color:var(--t4)">0건</span>
         </div>
+        <!-- 멤버 필터 -->
+        <div id="fixedMemberFilter" style="display:none;gap:.375rem;flex-wrap:wrap;margin-bottom:.625rem"></div>
         <div id="fixedList" style="margin-bottom:.625rem"></div>
         <div class="or-divider" style="margin:.5rem 0">항목 추가</div>
         <div style="display:flex;flex-direction:column;gap:.5rem">
@@ -305,6 +308,10 @@
               onkeydown="if(event.key==='Enter')addFixed()">
             <input id="fixedAmount" type="number" placeholder="금액" class="app-input" style="width:108px;flex-shrink:0"
               onkeydown="if(event.key==='Enter')addFixed()">
+          </div>
+          <!-- 멤버 선택 (멤버 설정 시 표시) -->
+          <div id="fixedMemberSelRow" style="display:none">
+            <select id="fixedMemberSel" class="app-input" style="width:100%"></select>
           </div>
           <div style="display:flex;gap:.5rem">
             <select id="fixedCategory" class="app-input" style="flex:1"></select>
