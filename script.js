@@ -793,8 +793,10 @@ function renderDashboard() {
     badge.innerHTML = `<span style="font-size:.6875rem;color:var(--t5)">전월 데이터 없음</span>`;
   }
 
+  const merged = getMergedExpenses(); // 카드 + 고정 + 예정 통합
+
   renderBudgetSummary(active);
-  renderChart(active);
+  renderChart(merged);
   renderMomComparison(active, prevActive);
 
   const clearBtn = document.getElementById('clearMonthBtn');
@@ -805,11 +807,11 @@ function renderDashboard() {
 
   if (state.rightTab === 'calendar') {
     const listCountEl = document.getElementById('listCount');
-    if (listCountEl) listCountEl.textContent = `${active.length}건`;
+    if (listCountEl) listCountEl.textContent = `${merged.length}건`;
     renderCalendar(txs);
   } else {
-    renderDetailTabs();
-    renderTxList(txs);
+    renderDetailTabs(merged);
+    renderTxList(merged);
   }
 
   renderMemberPills(allTxs);
@@ -819,6 +821,53 @@ function renderDashboard() {
     const bdCard = document.getElementById('memberBreakdownCard');
     if (bdCard) bdCard.classList.add('hidden');
   }
+}
+
+/* ── 카드 + 고정지출 + 예정지출 통합 ── */
+function getMergedExpenses() {
+  // 1. 카드 지출 (이번달)
+  const allTx = JSON.parse(localStorage.getItem(SK.TX) || '{}');
+  const cardItems = ((allTx[state.ym] || []).filter(t => !t.isCancelled))
+    .map(t => ({ ...t, _type: 'card' }));
+
+  // 2. 고정지출 (매월 반복)
+  const fixedItems = getFixed().map(f => ({
+    id: 'f-' + f.id,
+    merchant: f.name,
+    amount: f.amount,
+    category: f.category || '기타',
+    date: state.ym + '-01',
+    isCancelled: false,
+    memberId: f.member || null,
+    _type: 'fixed',
+  }));
+
+  // 3. 예정지출 (이번달 해당 날짜)
+  const [curY, curM] = state.ym.split('-').map(Number);
+  const planItems = getPlanned()
+    .filter(p => { const d = new Date(p.date); return d.getFullYear() === curY && d.getMonth() + 1 === curM; })
+    .map(p => ({
+      id: 'p-' + p.id,
+      merchant: p.name,
+      amount: p.amount,
+      category: p.category || '기타',
+      date: p.date,
+      isCancelled: false,
+      memberId: null,
+      _type: 'plan',
+    }));
+
+  // 멤버 필터 적용
+  const mid = state.activeMember;
+  const byMember = items => mid === 'all'
+    ? items
+    : items.filter(i => i.memberId === mid || i.memberId === null);
+
+  return [
+    ...byMember(cardItems),
+    ...byMember(fixedItems),
+    ...byMember(planItems),
+  ];
 }
 
 function renderBudgetSummary(activeTxs) {
@@ -982,22 +1031,25 @@ function renderMomComparison(txs, prevTxs) {
   }).join('');
 }
 
-function renderDetailTabs() {
+function renderDetailTabs(mergedItems) {
   const container = document.getElementById('detailTabs');
   if (!container) return;
-  container.innerHTML = Object.keys(CAT_GROUPS_FOR_TABS).map(tab => `
-    <button class="detail-tab-btn ${state.detailTab === tab ? 'active' : ''}"
-            onclick="switchDetailTab('${tab}')">
-      ${tab}
-    </button>
-  `).join('');
+  const items = mergedItems || getMergedExpenses();
+  container.innerHTML = Object.keys(CAT_GROUPS_FOR_TABS).map(tab => {
+    const targets = CAT_GROUPS_FOR_TABS[tab];
+    const cnt = targets ? items.filter(i => targets.includes(i.category)).length : items.length;
+    return `<button class="detail-tab-btn ${state.detailTab === tab ? 'active' : ''}"
+      onclick="switchDetailTab('${tab}')">
+      ${tab}${cnt > 0 ? `<span style="margin-left:.25rem;font-size:.6rem;opacity:.65">${cnt}</span>` : ''}
+    </button>`;
+  }).join('');
 }
 
 function switchDetailTab(tab) {
   state.detailTab = tab;
-  renderDetailTabs();
-  const all = JSON.parse(localStorage.getItem(SK.TX) || '{}');
-  renderTxList(all[state.ym] || []);
+  const merged = getMergedExpenses();
+  renderDetailTabs(merged);
+  renderTxList(merged);
 }
 
 function renderTxList(txs) {
@@ -1010,6 +1062,11 @@ function renderTxList(txs) {
     if (targets) filtered = txs.filter(tx => targets.includes(tx.category));
   }
 
+  // 멤버 필터 적용 (card txs만, fixed/plan은 getMergedExpenses에서 이미 처리)
+  if (state.activeMember !== 'all') {
+    filtered = filtered.filter(tx => tx._type !== 'card' || tx.memberId === state.activeMember);
+  }
+
   const listCountEl = document.getElementById('listCount');
   if (listCountEl) listCountEl.textContent = `${filtered.length}건`;
 
@@ -1017,16 +1074,43 @@ function renderTxList(txs) {
     list.innerHTML = `<p style="text-align:center;color:var(--t5);padding:2rem 0;font-size:0.8rem">내역이 없습니다</p>`;
     return;
   }
-  list.innerHTML = filtered.sort((a, b) => b.date.localeCompare(a.date)).map(tx => `
-    <div class="divider-row" style="display:flex;justify-content:space-between;align-items:center;">
-      <div style="font-size:13px;">
-        <div style="font-weight:600;">${tx.merchant}</div>
-        <div style="font-size:11px;color:${CATEGORIES[tx.category]?.color || 'var(--t4)'};font-weight:600;">${tx.category}</div>
-        <div style="font-size:10px;color:var(--t5)">${tx.date}</div>
-      </div>
-      <div style="font-weight:700;${tx.isCancelled ? 'color:#EF4444;' : ''}">${tx.isCancelled ? '-' : ''}${fmtAmt(tx.amount)}</div>
-    </div>
-  `).join('');
+
+  const typeBadge = type => {
+    if (type === 'fixed') return `<span style="font-size:.5rem;font-weight:800;padding:.1rem .35rem;border-radius:9999px;background:#8B5CF615;color:#8B5CF6;letter-spacing:.02em;margin-left:.25rem">고정</span>`;
+    if (type === 'plan')  return `<span style="font-size:.5rem;font-weight:800;padding:.1rem .35rem;border-radius:9999px;background:#F59E0B15;color:#D97706;letter-spacing:.02em;margin-left:.25rem">예정</span>`;
+    return '';
+  };
+  const dateLabel = tx => {
+    if (tx._type === 'fixed') return '매월 고정';
+    if (tx._type === 'plan')  return `${tx.date} 예정`;
+    return tx.date;
+  };
+
+  const allCats = getAllCategories();
+  list.innerHTML = filtered
+    .slice().sort((a, b) => {
+      // 날짜 내림차순, 같은 날짜면 card → plan → fixed 순
+      const dateDiff = b.date.localeCompare(a.date);
+      if (dateDiff !== 0) return dateDiff;
+      const order = { card: 0, plan: 1, fixed: 2 };
+      return (order[a._type] || 0) - (order[b._type] || 0);
+    })
+    .map(tx => {
+      const catInfo = allCats[tx.category] || { color: 'var(--t4)' };
+      return `
+        <div class="divider-row" style="display:flex;justify-content:space-between;align-items:center;gap:.5rem">
+          <div style="flex:1;min-width:0;font-size:13px">
+            <div style="display:flex;align-items:center;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+              ${tx.merchant}${typeBadge(tx._type)}
+            </div>
+            <div style="font-size:11px;color:${catInfo.color};font-weight:600;margin-top:.1rem">${tx.category}</div>
+            <div style="font-size:10px;color:var(--t5);margin-top:.05rem">${dateLabel(tx)}</div>
+          </div>
+          <div style="font-weight:700;flex-shrink:0;${tx.isCancelled ? 'color:#EF4444' : ''}">
+            ${tx.isCancelled ? '-' : ''}${fmtAmt(tx.amount)}
+          </div>
+        </div>`;
+    }).join('');
 }
 
 function renderKeywords() {
