@@ -1694,7 +1694,6 @@ function renderPlanned() {
     return;
   }
 
-  const members = getMembers();
   const memberMap = Object.fromEntries(members.map(m => [m.id, m]));
 
   container.innerHTML = sorted.map(item => {
