@@ -826,54 +826,84 @@ function renderBudgetSummary(activeTxs) {
   if (!el) return;
 
   const incomeTotal = getIncome().reduce((s, i) => s + i.amount, 0);
-  const fixedTotal  = getFixed().reduce((s, i) => s + i.amount, 0);
-  const txTotal     = activeTxs.reduce((s, t) => s + t.amount, 0);
-  const totalSpend  = fixedTotal + txTotal;
-  const balance     = incomeTotal - totalSpend;
-  const balColor    = balance >= 0 ? 'var(--color-income)' : 'var(--color-expense)';
+  const fixedList   = getFixed();
+  const fixedTotal  = fixedList.reduce((s, i) => s + i.amount, 0);
 
-  if (incomeTotal === 0) {
-    el.innerHTML = `<p style="font-size:.75rem;color:var(--t5);text-align:center;padding:.5rem 0">수입 설정에서 월 수입을 등록하면 예산 현황이 표시됩니다</p>`;
-    return;
-  }
+  // 이번 달에 해당하는 예정지출만 포함
+  const [curY, curM] = state.ym.split('-').map(Number);
+  const planList  = getPlanned().filter(item => {
+    const d = new Date(item.date);
+    return d.getFullYear() === curY && d.getMonth() + 1 === curM;
+  });
+  const planTotal = planList.reduce((s, i) => s + i.amount, 0);
 
-  const pct      = Math.min(Math.round(totalSpend / incomeTotal * 100), 999);
-  const barPct   = Math.min(pct, 100);
+  const txTotal    = activeTxs.reduce((s, t) => s + t.amount, 0);
+  const totalSpend = fixedTotal + planTotal + txTotal;
+  const balance    = incomeTotal - totalSpend;
+  const balColor   = balance >= 0 ? 'var(--color-income)' : 'var(--color-expense)';
+
+  const pct    = incomeTotal > 0 ? Math.min(Math.round(totalSpend / incomeTotal * 100), 999) : 0;
+  const barPct = Math.min(pct, 100);
   const barColor = pct >= 100 ? 'var(--color-expense)' : pct >= 80 ? '#F59E0B' : 'var(--color-income)';
 
-  const row = (dotColor, label, sign, amt, valueColor) => `
-    <div style="display:flex;justify-content:space-between;align-items:center;padding:.375rem 0;border-top:1px solid var(--divider)">
+  const row = (dotColor, label, sub, amt) => `
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:.4rem 0;border-top:1px solid var(--divider)">
       <div style="display:flex;align-items:center;gap:.5rem">
-        <span style="width:.375rem;height:.375rem;border-radius:50%;background:${dotColor};flex-shrink:0"></span>
-        <span style="font-size:.75rem;color:var(--t3)">${label}</span>
+        <span style="width:.3rem;height:.3rem;border-radius:50%;background:${dotColor};flex-shrink:0"></span>
+        <div>
+          <span style="font-size:.75rem;color:var(--t3)">${label}</span>
+          ${sub ? `<span style="font-size:.625rem;color:var(--t5);margin-left:.3rem">${sub}</span>` : ''}
+        </div>
       </div>
-      <span class="num" style="font-size:.75rem;font-weight:700;color:${valueColor}">${sign}${fmtAmt(amt)}</span>
+      <span class="num" style="font-size:.75rem;font-weight:700;color:var(--t2)">-${fmtAmt(amt)}</span>
     </div>`;
 
-  el.innerHTML = `
-    <div style="display:flex;flex-direction:column">
-      <div style="display:flex;justify-content:space-between;align-items:center;padding:.375rem 0">
+  const incomeRow = incomeTotal > 0
+    ? `<div style="display:flex;justify-content:space-between;align-items:center;padding:.4rem 0">
         <div style="display:flex;align-items:center;gap:.5rem">
-          <span style="width:.375rem;height:.375rem;border-radius:50%;background:var(--color-income);flex-shrink:0"></span>
+          <span style="width:.3rem;height:.3rem;border-radius:50%;background:var(--color-income);flex-shrink:0"></span>
           <span style="font-size:.75rem;color:var(--t3)">월 수입</span>
         </div>
         <span class="num" style="font-size:.75rem;font-weight:700;color:var(--color-income)">+${fmtAmt(incomeTotal)}</span>
+      </div>`
+    : `<div style="display:flex;justify-content:space-between;align-items:center;padding:.4rem 0">
+        <div style="display:flex;align-items:center;gap:.5rem">
+          <span style="width:.3rem;height:.3rem;border-radius:50%;background:var(--t5);flex-shrink:0"></span>
+          <span style="font-size:.75rem;color:var(--t4)">월 수입</span>
+        </div>
+        <button onclick="switchTab('income')" style="font-size:.6875rem;font-weight:600;color:#6366F1;background:none;border:none;cursor:pointer;padding:0">수입 설정하기 →</button>
+      </div>`;
+
+  const balanceRow = incomeTotal > 0
+    ? `<div style="display:flex;justify-content:space-between;align-items:center;padding:.5rem 0;border-top:2px solid var(--border);margin-top:.125rem">
+        <div>
+          <span style="font-size:.8125rem;font-weight:800;color:var(--t1)">이번 달 잔액</span>
+          <span style="font-size:.6875rem;color:var(--t5);margin-left:.375rem">수입 − 지출 합계</span>
+        </div>
+        <span class="num" style="font-size:.9375rem;font-weight:800;color:${balColor}">${balance >= 0 ? '+' : ''}${fmtAmt(balance)}</span>
       </div>
-      ${row('#8B5CF6','고정 지출','-',fixedTotal,'var(--t2)')}
-      ${row('var(--color-expense)','카드 지출','-',txTotal,'var(--t2)')}
-      <div style="display:flex;justify-content:space-between;align-items:center;padding:.5rem 0;border-top:2px solid var(--border);margin-top:.125rem">
-        <span style="font-size:.8125rem;font-weight:800;color:var(--t1)">잔액</span>
-        <span class="num" style="font-size:.875rem;font-weight:800;color:${balColor}">${balance >= 0 ? '+' : ''}${fmtAmt(balance)}</span>
-      </div>
-      <div style="margin-top:.25rem">
+      <div style="margin-top:.375rem">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.3rem">
           <span style="font-size:.6875rem;color:var(--t4)">지출 비율</span>
           <span class="num" style="font-size:.6875rem;font-weight:700;color:${barColor}">${pct}%</span>
         </div>
         <div style="background:var(--bg-inset);border-radius:9999px;height:6px;overflow:hidden">
-          <div style="background:${barColor};height:100%;border-radius:9999px;width:${barPct}%;transition:width .4s ease"></div>
+          <div style="background:${barColor};height:100%;border-radius:9999px;width:${barPct}%;transition:width .5s ease"></div>
         </div>
-      </div>
+      </div>`
+    : `<div style="border-top:2px solid var(--border);margin-top:.125rem;padding:.5rem 0">
+        <p style="font-size:.6875rem;color:var(--t5);text-align:center">수입을 설정하면 이번 달 잔액이 계산됩니다</p>
+      </div>`;
+
+  el.innerHTML = `
+    <div style="display:flex;flex-direction:column">
+      ${incomeRow}
+      ${fixedTotal > 0 ? row('#8B5CF6', '고정 지출', `${fixedList.length}건`, fixedTotal) : ''}
+      ${planTotal  > 0 ? row('#F59E0B', '예정 지출', `${planList.length}건`, planTotal)  : ''}
+      ${txTotal    > 0 ? row('var(--color-expense)', '카드 지출', `${activeTxs.length}건`, txTotal) : ''}
+      ${(fixedTotal === 0 && planTotal === 0 && txTotal === 0)
+        ? `<p style="font-size:.6875rem;color:var(--t5);text-align:center;padding:.5rem 0;border-top:1px solid var(--divider)">고정지출·예정지출·카드내역을 입력하면 계산됩니다</p>`
+        : balanceRow}
     </div>`;
 }
 
