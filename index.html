@@ -85,9 +85,8 @@
     <nav style="display:flex;gap:1.25rem;overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none" class="hide-scrollbar">
       <button class="tab-btn" data-tab="dashboard" onclick="switchTab('dashboard')">대시보드</button>
       <button class="tab-btn" data-tab="input"     onclick="switchTab('input')">내역 입력</button>
-      <button class="tab-btn" data-tab="fixed"     onclick="switchTab('fixed')">고정지출</button>
+      <button class="tab-btn" data-tab="expense"   onclick="switchTab('expense')">지출 관리</button>
       <button class="tab-btn" data-tab="income"    onclick="switchTab('income')">수입 설정</button>
-      <button class="tab-btn" data-tab="plan"      onclick="switchTab('plan')">예정 지출</button>
     </nav>
   </header>
 
@@ -277,57 +276,120 @@
 
 
   <!-- ══════════════════════════════════════════
-    탭 4: 고정지출 계획
+    탭 4: 지출 관리 (고정지출 + 예정지출)
   ══════════════════════════════════════════ -->
-  <div id="tab-fixed" class="tab-content hidden">
-    <div style="display:flex;flex-direction:column;gap:.75rem">
+  <div id="tab-expense" class="tab-content hidden">
 
-      <!-- 히어로: 월 예상 고정지출 + 카테고리 비중 -->
-      <div class="card">
-        <p style="font-size:.6875rem;font-weight:600;color:var(--t4);letter-spacing:.04em;text-transform:uppercase;margin-bottom:.375rem">월 예상 고정지출</p>
-        <p id="fixedTotalAmt" class="num" style="font-size:2.25rem;font-weight:800;color:var(--color-expense);line-height:1;letter-spacing:-.03em;margin-bottom:.375rem">0원</p>
-        <div id="fixedMemberBreakdown"></div>
-        <div id="fixedBreakdown" style="margin-top:.375rem">
-          <p style="font-size:.75rem;color:var(--t5);text-align:center;padding:.5rem 0">항목을 추가하면 비중이 표시됩니다</p>
-        </div>
-      </div>
-
-      <!-- 항목 목록 + 추가 폼 -->
-      <div class="card">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.375rem">
-          <h2 style="font-size:.8125rem;font-weight:700;color:var(--t2)">고정 지출 항목</h2>
-          <span id="fixedCount" style="font-size:.6875rem;color:var(--t4)">0건</span>
-        </div>
-        <!-- 멤버 필터 -->
-        <div id="fixedMemberFilter" style="display:none;gap:.375rem;flex-wrap:wrap;margin-bottom:.625rem"></div>
-        <div id="fixedList" style="margin-bottom:.625rem"></div>
-        <div class="or-divider" style="margin:.5rem 0">항목 추가</div>
-        <div style="display:flex;flex-direction:column;gap:.5rem">
-          <div style="display:flex;gap:.5rem">
-            <input id="fixedName" type="text" placeholder="항목명 (예: 아파트 관리비)" class="app-input" style="flex:1;min-width:0"
-              onkeydown="if(event.key==='Enter')addFixed()">
-            <input id="fixedAmount" type="number" placeholder="금액" class="app-input" style="width:108px;flex-shrink:0"
-              onkeydown="if(event.key==='Enter')addFixed()">
-          </div>
-          <!-- 멤버 선택 (멤버 설정 시 표시) -->
-          <div id="fixedMemberSelRow" style="display:none">
-            <select id="fixedMemberSel" class="app-input" style="width:100%"></select>
-          </div>
-          <div style="display:flex;gap:.5rem">
-            <select id="fixedCategory" class="app-input" style="flex:1"></select>
-            <button onclick="openCatModal()" title="카테고리 관리"
-              style="display:flex;align-items:center;gap:.3rem;font-size:.6875rem;font-weight:600;color:var(--t3);background:var(--bg-inset);border:1px solid var(--border);border-radius:.625rem;padding:.4rem .625rem;cursor:pointer;flex-shrink:0;transition:background .15s"
-              onmouseover="this.style.background='var(--bg-raised)'" onmouseout="this.style.background='var(--bg-inset)'">
-              <i data-lucide="tag" style="width:12px;height:12px"></i>관리
-            </button>
-            <button onclick="addFixed()" class="btn-sm">추가하기</button>
-          </div>
-        </div>
-      </div>
-
+    <!-- 서브탭 바 -->
+    <div style="display:flex;padding:.5rem 1.25rem 0;gap:0;border-bottom:1px solid var(--border);background:var(--bg-card);position:sticky;top:88px;z-index:5">
+      <button class="expense-sub-btn" id="expSubBtn-fixed" onclick="switchExpenseTab('fixed')"
+        style="flex:1;padding:.5rem .75rem;font-size:.8125rem;font-weight:700;border:none;border-bottom:2px solid transparent;background:none;cursor:pointer;color:var(--t4);transition:color .15s,border-color .15s">
+        고정지출
+      </button>
+      <button class="expense-sub-btn" id="expSubBtn-plan" onclick="switchExpenseTab('plan')"
+        style="flex:1;padding:.5rem .75rem;font-size:.8125rem;font-weight:700;border:none;border-bottom:2px solid transparent;background:none;cursor:pointer;color:var(--t4);transition:color .15s,border-color .15s">
+        예정 지출
+      </button>
     </div>
-    <div style="height:2rem"></div>
-  </div><!-- /tab-fixed -->
+
+    <!-- ── 고정지출 서브콘텐츠 ── -->
+    <div id="expense-fixed" class="expense-sub-content">
+      <div style="display:flex;flex-direction:column;gap:.75rem;padding:0">
+
+        <!-- 히어로 -->
+        <div class="card">
+          <p style="font-size:.6875rem;font-weight:600;color:var(--t4);letter-spacing:.04em;text-transform:uppercase;margin-bottom:.375rem">월 예상 고정지출</p>
+          <p id="fixedTotalAmt" class="num" style="font-size:2.25rem;font-weight:800;color:var(--color-expense);line-height:1;letter-spacing:-.03em;margin-bottom:.375rem">0원</p>
+          <div id="fixedMemberBreakdown"></div>
+          <div id="fixedBreakdown" style="margin-top:.375rem">
+            <p style="font-size:.75rem;color:var(--t5);text-align:center;padding:.5rem 0">항목을 추가하면 비중이 표시됩니다</p>
+          </div>
+        </div>
+
+        <!-- 항목 목록 + 추가 폼 -->
+        <div class="card">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.375rem">
+            <h2 style="font-size:.8125rem;font-weight:700;color:var(--t2)">고정 지출 항목</h2>
+            <span id="fixedCount" style="font-size:.6875rem;color:var(--t4)">0건</span>
+          </div>
+          <div id="fixedMemberFilter" style="display:none;gap:.375rem;flex-wrap:wrap;margin-bottom:.625rem"></div>
+          <div id="fixedList" style="margin-bottom:.625rem"></div>
+          <div class="or-divider" style="margin:.5rem 0">항목 추가</div>
+          <div style="display:flex;flex-direction:column;gap:.5rem">
+            <div style="display:flex;gap:.5rem">
+              <input id="fixedName" type="text" placeholder="항목명 (예: 아파트 관리비)" class="app-input" style="flex:1;min-width:0"
+                onkeydown="if(event.key==='Enter')addFixed()">
+              <input id="fixedAmount" type="number" placeholder="금액" class="app-input" style="width:108px;flex-shrink:0"
+                onkeydown="if(event.key==='Enter')addFixed()">
+            </div>
+            <div id="fixedMemberSelRow" style="display:none">
+              <select id="fixedMemberSel" class="app-input" style="width:100%"></select>
+            </div>
+            <div style="display:flex;gap:.5rem">
+              <select id="fixedCategory" class="app-input" style="flex:1"></select>
+              <button onclick="openCatModal()" title="카테고리 관리"
+                style="display:flex;align-items:center;gap:.3rem;font-size:.6875rem;font-weight:600;color:var(--t3);background:var(--bg-inset);border:1px solid var(--border);border-radius:.625rem;padding:.4rem .625rem;cursor:pointer;flex-shrink:0;transition:background .15s"
+                onmouseover="this.style.background='var(--bg-raised)'" onmouseout="this.style.background='var(--bg-inset)'">
+                <i data-lucide="tag" style="width:12px;height:12px"></i>관리
+              </button>
+              <button onclick="addFixed()" class="btn-sm">추가하기</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+      <div style="height:2rem"></div>
+    </div><!-- /expense-fixed -->
+
+    <!-- ── 예정지출 서브콘텐츠 ── -->
+    <div id="expense-plan" class="expense-sub-content hidden">
+      <div style="display:flex;flex-direction:column;gap:.75rem">
+
+        <!-- 히어로 -->
+        <div class="card">
+          <p style="font-size:.6875rem;font-weight:600;color:var(--t4);letter-spacing:.04em;text-transform:uppercase;margin-bottom:.375rem">이번 달 남은 예정 지출</p>
+          <p id="planHeroAmt" class="num" style="font-size:2.25rem;font-weight:800;color:var(--color-expense);line-height:1;letter-spacing:-.03em;margin-bottom:.5rem">0원</p>
+          <p id="planHeroSub" style="font-size:.75rem;color:var(--t4)">예정 항목 없음</p>
+        </div>
+
+        <!-- 항목 목록 + 추가 폼 -->
+        <div class="card">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.625rem">
+            <h2 style="font-size:.8125rem;font-weight:700;color:var(--t2)">예정 지출 항목</h2>
+            <span id="planCount" style="font-size:.6875rem;color:var(--t4)">0건</span>
+          </div>
+          <p style="font-size:.6875rem;color:var(--t5);margin-bottom:.625rem">경조사·세금·보험료 등 특정 날짜에 나갈 돈을 미리 등록하면 D-day로 확인할 수 있습니다.</p>
+          <div id="planList" style="margin-bottom:.625rem"></div>
+          <div class="or-divider" style="margin:.5rem 0">항목 추가</div>
+          <div style="display:flex;flex-direction:column;gap:.5rem">
+            <div style="display:flex;gap:.5rem">
+              <input id="planName" type="text" placeholder="항목명 (예: 친구 결혼식 축의금)" class="app-input" style="flex:1;min-width:0"
+                onkeydown="if(event.key==='Enter')addPlanned()">
+              <input id="planAmount" type="number" placeholder="금액" class="app-input" style="width:108px;flex-shrink:0"
+                onkeydown="if(event.key==='Enter')addPlanned()">
+            </div>
+            <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+              <input id="planDate" type="hidden">
+              <button type="button" onclick="openDatePicker('planDate','planDateLabel')" class="app-input" style="flex:1;min-width:130px;display:flex;align-items:center;gap:.375rem;cursor:pointer">
+                <i data-lucide="calendar" style="width:13px;height:13px;color:var(--t4);flex-shrink:0"></i>
+                <span id="planDateLabel" style="color:var(--t4)">날짜 선택</span>
+              </button>
+              <select id="planCategory" class="app-input" style="flex:1;min-width:88px"></select>
+              <button onclick="openCatModal()" title="카테고리 관리"
+                style="display:flex;align-items:center;gap:.3rem;font-size:.6875rem;font-weight:600;color:var(--t3);background:var(--bg-inset);border:1px solid var(--border);border-radius:.625rem;padding:.4rem .625rem;cursor:pointer;flex-shrink:0;transition:background .15s"
+                onmouseover="this.style.background='var(--bg-raised)'" onmouseout="this.style.background='var(--bg-inset)'">
+                <i data-lucide="tag" style="width:12px;height:12px"></i>관리
+              </button>
+              <button onclick="addPlanned()" class="btn-sm" style="flex-shrink:0">추가하기</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+      <div style="height:2rem"></div>
+    </div><!-- /expense-plan -->
+
+  </div><!-- /tab-expense -->
 
 
   <!-- ══════════════════════════════════════════
@@ -375,58 +437,6 @@
   </div><!-- /tab-income -->
 
 
-  <!-- ══════════════════════════════════════════
-    탭 6: 예정 지출
-  ══════════════════════════════════════════ -->
-  <div id="tab-plan" class="tab-content hidden">
-    <div style="display:flex;flex-direction:column;gap:.75rem">
-
-      <!-- 히어로: 이번 달 남은 예정 지출 합계 -->
-      <div class="card">
-        <p style="font-size:.6875rem;font-weight:600;color:var(--t4);letter-spacing:.04em;text-transform:uppercase;margin-bottom:.375rem">이번 달 남은 예정 지출</p>
-        <p id="planHeroAmt" class="num" style="font-size:2.25rem;font-weight:800;color:var(--color-expense);line-height:1;letter-spacing:-.03em;margin-bottom:.5rem">0원</p>
-        <p id="planHeroSub" style="font-size:.75rem;color:var(--t4)">예정 항목 없음</p>
-      </div>
-
-      <!-- 예정 지출 항목 목록 + 추가 폼 -->
-      <div class="card">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.625rem">
-          <h2 style="font-size:.8125rem;font-weight:700;color:var(--t2)">예정 지출 항목</h2>
-          <span id="planCount" style="font-size:.6875rem;color:var(--t4)">0건</span>
-        </div>
-
-        <!-- 안내 텍스트 -->
-        <p style="font-size:.6875rem;color:var(--t5);margin-bottom:.625rem">경조사·세금·보험료 등 특정 날짜에 나갈 돈을 미리 등록하면 D-day로 확인할 수 있습니다.</p>
-
-        <div id="planList" style="margin-bottom:.625rem"></div>
-        <div class="or-divider" style="margin:.5rem 0">항목 추가</div>
-        <div style="display:flex;flex-direction:column;gap:.5rem">
-          <div style="display:flex;gap:.5rem">
-            <input id="planName" type="text" placeholder="항목명 (예: 친구 결혼식 축의금)" class="app-input" style="flex:1;min-width:0"
-              onkeydown="if(event.key==='Enter')addPlanned()">
-            <input id="planAmount" type="number" placeholder="금액" class="app-input" style="width:108px;flex-shrink:0"
-              onkeydown="if(event.key==='Enter')addPlanned()">
-          </div>
-          <div style="display:flex;gap:.5rem;flex-wrap:wrap">
-            <input id="planDate" type="hidden">
-            <button type="button" onclick="openDatePicker('planDate','planDateLabel')" class="app-input" style="flex:1;min-width:130px;display:flex;align-items:center;gap:.375rem;cursor:pointer">
-              <i data-lucide="calendar" style="width:13px;height:13px;color:var(--t4);flex-shrink:0"></i>
-              <span id="planDateLabel" style="color:var(--t4)">날짜 선택</span>
-            </button>
-            <select id="planCategory" class="app-input" style="flex:1;min-width:88px"></select>
-            <button onclick="openCatModal()" title="카테고리 관리"
-              style="display:flex;align-items:center;gap:.3rem;font-size:.6875rem;font-weight:600;color:var(--t3);background:var(--bg-inset);border:1px solid var(--border);border-radius:.625rem;padding:.4rem .625rem;cursor:pointer;flex-shrink:0;transition:background .15s"
-              onmouseover="this.style.background='var(--bg-raised)'" onmouseout="this.style.background='var(--bg-inset)'">
-              <i data-lucide="tag" style="width:12px;height:12px"></i>관리
-            </button>
-            <button onclick="addPlanned()" class="btn-sm" style="flex-shrink:0">추가하기</button>
-          </div>
-        </div>
-      </div>
-
-    </div>
-    <div style="height:2rem"></div>
-  </div><!-- /tab-plan -->
 
 </div><!-- /app -->
 

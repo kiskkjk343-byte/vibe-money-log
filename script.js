@@ -66,6 +66,7 @@ const state = {
   activeMember: 'all',
   inputMember:  null,
   fixedMember:  'all',
+  expenseTab:   'fixed',
 };
 
 /* ── 유틸리티 ── */
@@ -708,12 +709,27 @@ function switchTab(tab) {
   const activeBtn = document.querySelector(`[data-tab="${tab}"]`);
   if (activeBtn) activeBtn.classList.add('tab-active');
   if (tab === 'dashboard') renderDashboard();
-  if (tab === 'fixed')     renderFixed();
+  if (tab === 'expense')   switchExpenseTab(state.expenseTab);
   if (tab === 'income')    renderIncome();
-  if (tab === 'plan')      renderPlanned();
   if (tab === 'input')     renderInputMemberSelector();
   refreshIcons();
 }
+
+function switchExpenseTab(subTab) {
+  state.expenseTab = subTab;
+  document.querySelectorAll('.expense-sub-content').forEach(el => el.classList.add('hidden'));
+  document.getElementById(`expense-${subTab}`)?.classList.remove('hidden');
+  document.querySelectorAll('.expense-sub-btn').forEach(btn => {
+    const isActive = btn.id === `expSubBtn-${subTab}`;
+    btn.style.color       = isActive ? 'var(--t1)'   : 'var(--t4)';
+    btn.style.borderBottom = isActive ? '2px solid var(--t1)' : '2px solid transparent';
+    btn.style.fontWeight  = isActive ? '800' : '700';
+  });
+  if (subTab === 'fixed') renderFixed();
+  if (subTab === 'plan')  renderPlanned();
+  refreshIcons();
+}
+window.switchExpenseTab = switchExpenseTab;
 
 function renderPreview() {
   const countEl = document.getElementById('previewCount');
@@ -2167,6 +2183,7 @@ document.addEventListener('DOMContentLoaded', () => {
 window.toggleDark      = toggleDark;
 window.toggleLayout    = toggleLayout;
 window.switchTab       = switchTab;
+window.switchExpenseTab = switchExpenseTab;
 window.switchDetailTab = switchDetailTab;
 window.switchRightTab  = switchRightTab;
 window.selectCalDay    = (d) => {
