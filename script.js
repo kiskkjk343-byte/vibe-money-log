@@ -711,7 +711,6 @@ function switchTab(tab) {
   if (tab === 'dashboard') renderDashboard();
   if (tab === 'expense')   switchExpenseTab(state.expenseTab);
   if (tab === 'income')    renderIncome();
-  if (tab === 'input')     renderInputMemberSelector();
   refreshIcons();
 }
 
@@ -727,6 +726,7 @@ function switchExpenseTab(subTab) {
   });
   if (subTab === 'fixed') renderFixed();
   if (subTab === 'plan')  renderPlanned();
+  if (subTab === 'input') renderInputMemberSelector();
   refreshIcons();
 }
 window.switchExpenseTab = switchExpenseTab;
@@ -793,6 +793,7 @@ function renderDashboard() {
     badge.innerHTML = `<span style="font-size:.6875rem;color:var(--t5)">전월 데이터 없음</span>`;
   }
 
+  renderBudgetSummary(active);
   renderChart(active);
   renderMomComparison(active, prevActive);
 
@@ -818,6 +819,62 @@ function renderDashboard() {
     const bdCard = document.getElementById('memberBreakdownCard');
     if (bdCard) bdCard.classList.add('hidden');
   }
+}
+
+function renderBudgetSummary(activeTxs) {
+  const el = document.getElementById('budgetSummary');
+  if (!el) return;
+
+  const incomeTotal = getIncome().reduce((s, i) => s + i.amount, 0);
+  const fixedTotal  = getFixed().reduce((s, i) => s + i.amount, 0);
+  const txTotal     = activeTxs.reduce((s, t) => s + t.amount, 0);
+  const totalSpend  = fixedTotal + txTotal;
+  const balance     = incomeTotal - totalSpend;
+  const balColor    = balance >= 0 ? 'var(--color-income)' : 'var(--color-expense)';
+
+  if (incomeTotal === 0) {
+    el.innerHTML = `<p style="font-size:.75rem;color:var(--t5);text-align:center;padding:.5rem 0">수입 설정에서 월 수입을 등록하면 예산 현황이 표시됩니다</p>`;
+    return;
+  }
+
+  const pct      = Math.min(Math.round(totalSpend / incomeTotal * 100), 999);
+  const barPct   = Math.min(pct, 100);
+  const barColor = pct >= 100 ? 'var(--color-expense)' : pct >= 80 ? '#F59E0B' : 'var(--color-income)';
+
+  const row = (dotColor, label, sign, amt, valueColor) => `
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:.375rem 0;border-top:1px solid var(--divider)">
+      <div style="display:flex;align-items:center;gap:.5rem">
+        <span style="width:.375rem;height:.375rem;border-radius:50%;background:${dotColor};flex-shrink:0"></span>
+        <span style="font-size:.75rem;color:var(--t3)">${label}</span>
+      </div>
+      <span class="num" style="font-size:.75rem;font-weight:700;color:${valueColor}">${sign}${fmtAmt(amt)}</span>
+    </div>`;
+
+  el.innerHTML = `
+    <div style="display:flex;flex-direction:column">
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:.375rem 0">
+        <div style="display:flex;align-items:center;gap:.5rem">
+          <span style="width:.375rem;height:.375rem;border-radius:50%;background:var(--color-income);flex-shrink:0"></span>
+          <span style="font-size:.75rem;color:var(--t3)">월 수입</span>
+        </div>
+        <span class="num" style="font-size:.75rem;font-weight:700;color:var(--color-income)">+${fmtAmt(incomeTotal)}</span>
+      </div>
+      ${row('#8B5CF6','고정 지출','-',fixedTotal,'var(--t2)')}
+      ${row('var(--color-expense)','카드 지출','-',txTotal,'var(--t2)')}
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:.5rem 0;border-top:2px solid var(--border);margin-top:.125rem">
+        <span style="font-size:.8125rem;font-weight:800;color:var(--t1)">잔액</span>
+        <span class="num" style="font-size:.875rem;font-weight:800;color:${balColor}">${balance >= 0 ? '+' : ''}${fmtAmt(balance)}</span>
+      </div>
+      <div style="margin-top:.25rem">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.3rem">
+          <span style="font-size:.6875rem;color:var(--t4)">지출 비율</span>
+          <span class="num" style="font-size:.6875rem;font-weight:700;color:${barColor}">${pct}%</span>
+        </div>
+        <div style="background:var(--bg-inset);border-radius:9999px;height:6px;overflow:hidden">
+          <div style="background:${barColor};height:100%;border-radius:9999px;width:${barPct}%;transition:width .4s ease"></div>
+        </div>
+      </div>
+    </div>`;
 }
 
 function renderChart(txs) {

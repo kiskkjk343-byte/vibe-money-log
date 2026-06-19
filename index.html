@@ -84,7 +84,6 @@
     <!-- 탭 바 -->
     <nav style="display:flex;gap:1.25rem;overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none" class="hide-scrollbar">
       <button class="tab-btn" data-tab="dashboard" onclick="switchTab('dashboard')">대시보드</button>
-      <button class="tab-btn" data-tab="input"     onclick="switchTab('input')">내역 입력</button>
       <button class="tab-btn" data-tab="expense"   onclick="switchTab('expense')">지출 관리</button>
       <button class="tab-btn" data-tab="income"    onclick="switchTab('income')">수입 설정</button>
     </nav>
@@ -117,6 +116,12 @@
             <div id="momBadge" style="margin-bottom:.125rem"></div>
           </div>
           <p id="txCount" style="font-size:.75rem;color:var(--t4);margin-top:.5rem">0건</p>
+        </div>
+
+        <!-- 이번 달 예산 현황 -->
+        <div class="card" id="budgetSummaryCard">
+          <h2 style="font-size:.8125rem;font-weight:700;color:var(--t2);margin-bottom:.75rem">이번 달 예산 현황</h2>
+          <div id="budgetSummary"></div>
         </div>
 
         <!-- 카테고리 차트 -->
@@ -197,82 +202,6 @@
   </div><!-- /tab-dashboard -->
 
 
-  <!-- ══════════════════════════════════════════
-    탭 2: 내역 입력
-  ══════════════════════════════════════════ -->
-  <div id="tab-input" class="tab-content hidden">
-    <div class="input-center" style="display:flex;flex-direction:column;gap:.75rem">
-
-      <div class="card">
-        <!-- 헤더 -->
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.25rem">
-          <h2 style="font-size:.8125rem;font-weight:700;color:var(--t2)">내역 입력</h2>
-          <button onclick="openSampleModal()" style="display:flex;align-items:center;gap:.3rem;font-size:.6875rem;font-weight:600;color:#6366F1;background:color-mix(in srgb,#6366F1 10%,var(--bg-inset));border:none;border-radius:.5rem;padding:.3rem .625rem;cursor:pointer;transition:background .15s" onmouseover="this.style.background='color-mix(in srgb,#6366F1 18%,var(--bg-inset))'" onmouseout="this.style.background='color-mix(in srgb,#6366F1 10%,var(--bg-inset))'">
-            <i data-lucide="eye" style="width:12px;height:12px"></i>
-            샘플 보기
-          </button>
-        </div>
-        <p style="font-size:.6875rem;color:var(--t4);margin-bottom:.875rem">파일을 업로드하거나 카드사 앱에서 복사한 텍스트를 붙여넣으세요.</p>
-
-        <!-- 파일 업로드 존 -->
-        <div id="uploadZone" class="upload-zone"
-          ondragover="handleDragOver(event)"
-          ondragleave="handleDragLeave(event)"
-          ondrop="handleDrop(event)">
-          <input type="file" id="fileInput" accept=".txt,.csv,.tsv,.pdf,.xlsx" onchange="handleFileSelect(event)">
-
-          <!-- 기본 상태 -->
-          <div id="uploadDefault">
-            <i data-lucide="upload-cloud" style="width:28px;height:28px;color:var(--t4);margin-bottom:.5rem"></i>
-            <p style="font-size:.8125rem;font-weight:600;color:var(--t2);margin-bottom:.25rem">파일 드래그 또는 클릭해서 업로드</p>
-            <p style="font-size:.6875rem;color:var(--t4)">.txt &nbsp;·&nbsp; .csv &nbsp;·&nbsp; .tsv &nbsp;·&nbsp; .pdf &nbsp;·&nbsp; .xlsx 지원</p>
-          </div>
-
-          <!-- 파일 선택 후 상태 -->
-          <div id="uploadSuccess" class="hidden" style="display:flex;align-items:center;justify-content:center;gap:.625rem">
-            <i data-lucide="file-check" style="width:20px;height:20px;color:#10B981"></i>
-            <div style="text-align:left">
-              <p id="uploadFileName" style="font-size:.8125rem;font-weight:700;color:var(--t1)"></p>
-              <p id="uploadFileSize" style="font-size:.6875rem;color:var(--t4)"></p>
-            </div>
-            <button id="clearFileBtn" onclick="clearUpload(event)" style="z-index:2;position:relative;margin-left:.25rem;background:var(--bg-raised);border:none;border-radius:50%;width:1.25rem;height:1.25rem;cursor:pointer;color:var(--t3);font-size:.875rem;line-height:1;display:flex;align-items:center;justify-content:center;transition:background .15s" onmouseover="this.style.background='var(--border)'" onmouseout="this.style.background='var(--bg-raised)'">×</button>
-          </div>
-        </div>
-
-        <!-- OR 구분선 -->
-        <div class="or-divider" style="margin:.875rem 0">직접 붙여넣기</div>
-
-        <!-- 지원 형식 안내 -->
-        <details style="margin-bottom:.625rem">
-          <summary style="font-size:.6875rem;font-weight:600;color:var(--t4);cursor:pointer;user-select:none;transition:color .15s" onmouseover="this.style.color='var(--t2)'" onmouseout="this.style.color='var(--t4)'">지원 형식 안내 ▸</summary>
-          <div style="margin-top:.5rem;background:var(--bg-inset);border-radius:.75rem;padding:.75rem;display:flex;flex-direction:column;gap:.2rem">
-            <p style="font-size:.6875rem;font-weight:700;color:var(--t3);margin-bottom:.375rem">한 줄에 1건씩 입력</p>
-            <p style="font-size:.6875rem;color:var(--t4);font-family:monospace">2025.01.15  스타벅스  4,500원</p>
-            <p style="font-size:.6875rem;color:var(--t4);font-family:monospace">01/15  배달의민족  23,000  할부3</p>
-            <p style="font-size:.6875rem;color:var(--t4);font-family:monospace">1월 15일  쿠팡  15,900원  (3/12개월)</p>
-            <p style="font-size:.6875rem;color:var(--t4);font-family:monospace">15  올리브영  38,000</p>
-          </div>
-        </details>
-
-        <textarea id="statementInput" rows="7" class="app-input"
-          placeholder="예시:&#10;2025.01.15  스타벅스  4,500원&#10;2025.01.16  배달의민족  23,000원  할부3&#10;2025.01.17  GS25  1,200원&#10;2025.01.18  CGV  14,000원"></textarea>
-
-        <button onclick="parseStatement()" class="btn-primary" style="margin-top:.75rem">분석하기</button>
-      </div>
-
-      <!-- 파싱 결과 프리뷰 -->
-      <div id="parsePreview" class="hidden">
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:0 .25rem;margin-bottom:.5rem">
-          <h2 style="font-size:.8125rem;font-weight:700;color:var(--t2)">분석 결과 <span id="previewCount" style="font-size:.6875rem;color:var(--t4);font-weight:400"></span></h2>
-          <button onclick="saveTransactions()" class="btn-sm">저장하기</button>
-        </div>
-        <div id="previewList" class="card" style="padding:0;overflow:hidden"></div>
-        <p style="font-size:.6875rem;color:var(--t4);text-align:center;margin-top:.5rem">카테고리 버튼을 눌러 수정할 수 있어요. 수정된 가맹점은 키워드 사전에 자동 저장됩니다.</p>
-      </div>
-
-    </div>
-    <div style="height:2rem"></div>
-  </div><!-- /tab-input -->
 
 
   <!-- ══════════════════════════════════════════
@@ -289,6 +218,10 @@
       <button class="expense-sub-btn" id="expSubBtn-plan" onclick="switchExpenseTab('plan')"
         style="flex:1;padding:.5rem .75rem;font-size:.8125rem;font-weight:700;border:none;border-bottom:2px solid transparent;background:none;cursor:pointer;color:var(--t4);transition:color .15s,border-color .15s">
         예정 지출
+      </button>
+      <button class="expense-sub-btn" id="expSubBtn-input" onclick="switchExpenseTab('input')"
+        style="flex:1;padding:.5rem .75rem;font-size:.8125rem;font-weight:700;border:none;border-bottom:2px solid transparent;background:none;cursor:pointer;color:var(--t4);transition:color .15s,border-color .15s">
+        내역 입력
       </button>
     </div>
 
@@ -388,6 +321,72 @@
       </div>
       <div style="height:2rem"></div>
     </div><!-- /expense-plan -->
+
+    <!-- ── 내역 입력 서브콘텐츠 ── -->
+    <div id="expense-input" class="expense-sub-content hidden">
+      <div class="input-center" style="display:flex;flex-direction:column;gap:.75rem">
+
+        <div class="card">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.25rem">
+            <h2 style="font-size:.8125rem;font-weight:700;color:var(--t2)">내역 입력</h2>
+            <button onclick="openSampleModal()" style="display:flex;align-items:center;gap:.3rem;font-size:.6875rem;font-weight:600;color:#6366F1;background:color-mix(in srgb,#6366F1 10%,var(--bg-inset));border:none;border-radius:.5rem;padding:.3rem .625rem;cursor:pointer;transition:background .15s" onmouseover="this.style.background='color-mix(in srgb,#6366F1 18%,var(--bg-inset))'" onmouseout="this.style.background='color-mix(in srgb,#6366F1 10%,var(--bg-inset))'">
+              <i data-lucide="eye" style="width:12px;height:12px"></i>
+              샘플 보기
+            </button>
+          </div>
+          <p style="font-size:.6875rem;color:var(--t4);margin-bottom:.875rem">파일을 업로드하거나 카드사 앱에서 복사한 텍스트를 붙여넣으세요.</p>
+
+          <div id="uploadZone" class="upload-zone"
+            ondragover="handleDragOver(event)"
+            ondragleave="handleDragLeave(event)"
+            ondrop="handleDrop(event)">
+            <input type="file" id="fileInput" accept=".txt,.csv,.tsv,.pdf,.xlsx" onchange="handleFileSelect(event)">
+            <div id="uploadDefault">
+              <i data-lucide="upload-cloud" style="width:28px;height:28px;color:var(--t4);margin-bottom:.5rem"></i>
+              <p style="font-size:.8125rem;font-weight:600;color:var(--t2);margin-bottom:.25rem">파일 드래그 또는 클릭해서 업로드</p>
+              <p style="font-size:.6875rem;color:var(--t4)">.txt &nbsp;·&nbsp; .csv &nbsp;·&nbsp; .tsv &nbsp;·&nbsp; .pdf &nbsp;·&nbsp; .xlsx 지원</p>
+            </div>
+            <div id="uploadSuccess" class="hidden" style="display:flex;align-items:center;justify-content:center;gap:.625rem">
+              <i data-lucide="file-check" style="width:20px;height:20px;color:#10B981"></i>
+              <div style="text-align:left">
+                <p id="uploadFileName" style="font-size:.8125rem;font-weight:700;color:var(--t1)"></p>
+                <p id="uploadFileSize" style="font-size:.6875rem;color:var(--t4)"></p>
+              </div>
+              <button id="clearFileBtn" onclick="clearUpload(event)" style="z-index:2;position:relative;margin-left:.25rem;background:var(--bg-raised);border:none;border-radius:50%;width:1.25rem;height:1.25rem;cursor:pointer;color:var(--t3);font-size:.875rem;line-height:1;display:flex;align-items:center;justify-content:center;transition:background .15s" onmouseover="this.style.background='var(--border)'" onmouseout="this.style.background='var(--bg-raised)'">×</button>
+            </div>
+          </div>
+
+          <div class="or-divider" style="margin:.875rem 0">직접 붙여넣기</div>
+
+          <details style="margin-bottom:.625rem">
+            <summary style="font-size:.6875rem;font-weight:600;color:var(--t4);cursor:pointer;user-select:none;transition:color .15s" onmouseover="this.style.color='var(--t2)'" onmouseout="this.style.color='var(--t4)'">지원 형식 안내 ▸</summary>
+            <div style="margin-top:.5rem;background:var(--bg-inset);border-radius:.75rem;padding:.75rem;display:flex;flex-direction:column;gap:.2rem">
+              <p style="font-size:.6875rem;font-weight:700;color:var(--t3);margin-bottom:.375rem">한 줄에 1건씩 입력</p>
+              <p style="font-size:.6875rem;color:var(--t4);font-family:monospace">2025.01.15  스타벅스  4,500원</p>
+              <p style="font-size:.6875rem;color:var(--t4);font-family:monospace">01/15  배달의민족  23,000  할부3</p>
+              <p style="font-size:.6875rem;color:var(--t4);font-family:monospace">1월 15일  쿠팡  15,900원  (3/12개월)</p>
+              <p style="font-size:.6875rem;color:var(--t4);font-family:monospace">15  올리브영  38,000</p>
+            </div>
+          </details>
+
+          <textarea id="statementInput" rows="7" class="app-input"
+            placeholder="예시:&#10;2025.01.15  스타벅스  4,500원&#10;2025.01.16  배달의민족  23,000원  할부3&#10;2025.01.17  GS25  1,200원&#10;2025.01.18  CGV  14,000원"></textarea>
+
+          <button onclick="parseStatement()" class="btn-primary" style="margin-top:.75rem">분석하기</button>
+        </div>
+
+        <div id="parsePreview" class="hidden">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:0 .25rem;margin-bottom:.5rem">
+            <h2 style="font-size:.8125rem;font-weight:700;color:var(--t2)">분석 결과 <span id="previewCount" style="font-size:.6875rem;color:var(--t4);font-weight:400"></span></h2>
+            <button onclick="saveTransactions()" class="btn-sm">저장하기</button>
+          </div>
+          <div id="previewList" class="card" style="padding:0;overflow:hidden"></div>
+          <p style="font-size:.6875rem;color:var(--t4);text-align:center;margin-top:.5rem">카테고리 버튼을 눌러 수정할 수 있어요. 수정된 가맹점은 키워드 사전에 자동 저장됩니다.</p>
+        </div>
+
+      </div>
+      <div style="height:2rem"></div>
+    </div><!-- /expense-input -->
 
   </div><!-- /tab-expense -->
 
